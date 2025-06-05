@@ -1,0 +1,35 @@
+[project]
+name = "ipdab"
+description = "The Debug Adapter Protocol (DAP) implementation for the ipdb debugger."
+version = "25.6.1"
+authors = [{ name = "Martin van der Schans" }]
+readme = "README.md"
+keywords = ["debugger", "dap", "ipdb", "debug-adapter-protocol", "python"]
+requires-python = ">=3.9"
+dependencies = ["ipdb"]
+license = { text = "BSD-3-Clause" }
+
+[project.urls]
+repository = "https://github.com/mvds314/ipdab"
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "W"] # Pycodestyle, pyflakes, bugbear, and isort
+ignore = [
+  # Ignore common conflicts with Blackjj
+  "E203",
+  "E501",
+  "E731", # Ignore lamda expression warning
+  "E402", # Ignore module level import not at top of file
+]
+
+[tool.pytest.ini_options]
+markers = [
+  "tofix: marks tests as to be fixed (deselect with '-m \"not tofix\"')",
+]
