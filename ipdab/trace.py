@@ -5,16 +5,16 @@ import time
 
 # import pdb
 from IPython.terminal.debugger import TerminalPdb
+from .debugger import Debugger
 
 
 class IPDBAdapterServer:
-    def __init__(self, host="127.0.0.1", port=9000):
+    def __init__(self, host="127.0.0.1", port=9000, debugger="ipdb"):
         self.host = host
         self.port = port
         self.server = None
         self.loop = None
-        # self.debugger = pdb.Pdb()
-        self.debugger = TerminalPdb()
+        self.debugger = Debugger(backend=debugger)
         self.client_writer = None
         self.client_reader = None
         self._shutdown_event = threading.Event()
