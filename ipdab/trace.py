@@ -128,10 +128,14 @@ class IPDBAdapterServer:
             self.loop.run_until_complete(self.start_server())
         except asyncio.CancelledError:
             pass
+        except Exception as e:
+            print(f"[Adapter] Event loop exception: {e}")
         finally:
             print("[Adapter] Event loop stopping")
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.close()
+            try:
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            finally:
+                self.loop.close()
 
     def start_in_thread(self):
         threading.Thread(target=self._run_loop, daemon=True).start()
