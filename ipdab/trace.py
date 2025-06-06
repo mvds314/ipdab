@@ -98,6 +98,26 @@ class IPDBAdapterServer:
                 except Exception as e:
                     response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
 
+            elif cmd == "setBreakpoints":
+                args = msg.get("arguments", {})
+                source = args.get("source", {})
+                path = source.get("path", "")
+                breakpoints = args.get("breakpoints", [])
+
+                # Clear old breakpoints in the file
+                if path in self.debugger.get_all_breaks():
+                    for bp_line in self.debugger.get_all_breaks()[path]:
+                        self.debugger.clear_break(path, bp_line)
+
+                actual_bps = []
+                for bp in breakpoints:
+                    line = bp.get("line")
+                    if line:
+                        self.debugger.set_break(path, line)
+                        actual_bps.append({"verified": True, "line": line})
+
+                response["body"] = {"breakpoints": actual_bps}
+
             else:
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
