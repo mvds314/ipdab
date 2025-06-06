@@ -1,17 +1,37 @@
 import pdb
+import asyncio
 from IPython.terminal.debugger import TerminalPdb
 
 
 class Debugger:
-    def __init__(self, backend="ipdb"):
+    def __init__(self, backend="ipdb", stopped_callback=None):
         backend = backend.lower()
         if backend == "ipdb":
+
+            class CustomTerminalPdb(TerminalPdb):
+                def user_line(inner_self, frame):
+                    super().user_line(frame)
+                    if stopped_callback:
+                        asyncio.run_coroutine_threadsafe(
+                            stopped_callback(reason="breakpoint"), asyncio.get_event_loop()
+                        )
+
             self.debugger = TerminalPdb()
         elif backend == "pdb":
-            self.debugger = pdb.Pdb()
+
+            class CustomPdb(pdb.Pdb):
+                def user_line(inner_self, frame):
+                    super().user_line(frame)
+                    if stopped_callback:
+                        asyncio.run_coroutine_threadsafe(
+                            stopped_callback(reason="breakpoint"), asyncio.get_event_loop()
+                        )
+
+            self.debugger = CustomPdb()
         else:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
         self.backend = backend
+        self.stopped_callback = stopped_callback
 
     def set_trace(self):
         self.debugger.set_trace()
