@@ -3,14 +3,15 @@ from IPython.terminal.debugger import TerminalPdb
 
 
 class Debugger:
-    def __init__(self, name="ipdb"):
-        if name == "ipdb":
+    def __init__(self, backend="ipdb"):
+        backend = backend.lower()
+        if backend == "ipdb":
             self.debugger = TerminalPdb()
-        elif name == "pdb":
+        elif backend == "pdb":
             self.debugger = pdb.Pdb()
         else:
-            raise ValueError(f"Unsupported debugger: {name}. Use 'ipdb' or 'pdb'.")
-        self.name = name.lower()
+            raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
+        self.backend = backend
 
     def set_trace(self):
         self.debugger.set_trace()
