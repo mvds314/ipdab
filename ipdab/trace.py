@@ -36,6 +36,25 @@ class IPDBAdapterServer:
         body = json.dumps(payload)
         return f"Content-Length: {len(body)}\r\n\r\n{body}".encode()
 
+    async def send_event(self, event_body):
+        event_msg = {"type": "event", "seq": 0, **event_body}
+        self.client_writer.write(self.encode_dap_message(event_msg))
+        await self.client_writer.drain()
+        print(f"[DAP] Sent event: {event_msg}")
+
+    async def notify_stopped(self, reason="breakpoint"):
+        if self.client_writer:
+            await self.send_event(
+                {
+                    "event": "stopped",
+                    "body": {
+                        "reason": reason,
+                        "threadId": 1,
+                        "allThreadsStopped": True,
+                    },
+                }
+            )
+
     async def handle_client(self, reader, writer):
         print("[DAP] Client connected")
         self.client_writer = writer
@@ -69,24 +88,78 @@ class IPDBAdapterServer:
             elif cmd == "launch":
                 response["body"] = {}
 
+                await self.send_event({"event": "initialized", "body": {}})
+
             elif cmd == "continue":
                 print("[DAP] Continue received")
                 # Resume ipdb execution
                 self.debugger.set_continue()
+                # Notify client that execution has resumed
+                await self.send_event("continued", {"threadId": 1, "allThreadsContinued": True})
 
             elif cmd == "pause":
                 print("[DAP] Pause received")
                 # Pause ipdb — simulate with set_trace() to drop in prompt
                 self.debugger.set_trace()
+                await self.send_event(
+                    "stopped",
+                    {
+                        "reason": "pause",
+                        "threadId": 1,
+                        "allThreadsStopped": True,
+                    },
+                )
 
             elif cmd == "stepIn":
                 print("[DAP] StepIn received")
                 self.debugger.set_step()
+                await self.send_event(
+                    "stopped",
+                    {
+                        "reason": "step",
+                        "threadId": 1,
+                        "allThreadsStopped": True,
+                    },
+                )
+
+            elif cmd == "stepOut":
+                print("[DAP] StepOut received")
+                self.debugger.set_return()  # if your debugger supports it, or implement accordingly
+                await self.send_event(
+                    "stopped",
+                    {
+                        "reason": "step",
+                        "threadId": 1,
+                        "allThreadsStopped": True,
+                    },
+                )
 
             elif cmd == "next":
                 print("[DAP] Next received")
                 self.debugger.set_next()
+                await self.send_event(
+                    "stopped",
+                    {
+                        "reason": "step",
+                        "threadId": 1,
+                        "allThreadsStopped": True,
+                    },
+                )
+            elif cmd == "configurationDone":
+                print("[DAP] Configuration done received")
+                response["body"] = {}
 
+                # Optional: Send a 'stopped' event to indicate the debugger is ready
+                await self.send_event(
+                    {
+                        "event": "stopped",
+                        "body": {
+                            "reason": "entry",
+                            "threadId": 1,
+                            "allThreadsStopped": True,
+                        },
+                    }
+                )
             elif cmd == "evaluate":
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
