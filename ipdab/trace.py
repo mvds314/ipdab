@@ -113,13 +113,26 @@ class IPDBAdapterServer:
         async with self.server:
             await self.server.serve_forever()
 
-    def start_in_thread(self):
-        def run_loop():
-            self.loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self.loop)
-            self.loop.run_until_complete(self.start_server())
+    def shutdown(self):
+        print("[Adapter] Shutdown initiated")
+        self._shutdown_event.set()
+        if self.loop:
+            self.loop.call_soon_threadsafe(self.loop.stop)
 
-        threading.Thread(target=run_loop, daemon=True).start()
+    def _run_loop(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_until_complete(self.start_server())
+        except asyncio.CancelledError:
+            pass
+        finally:
+            print("[Adapter] Event loop stopping")
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
+
+    def start_in_thread(self):
+        threading.Thread(target=self._run_loop, daemon=True).start()
 
     def set_trace(self):
         if not self.server:
@@ -150,4 +163,3 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         print("Exiting adapter server")
-
