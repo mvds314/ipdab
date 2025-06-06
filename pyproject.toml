@@ -6,7 +6,7 @@ authors = [{ name = "Martin van der Schans" }]
 readme = "README.md"
 keywords = ["debugger", "dap", "ipdb", "debug-adapter-protocol", "python"]
 requires-python = ">=3.9"
-dependencies = ["ipdb"]
+dependencies = ["ipython"]
 license = { text = "BSD-3-Clause" }
 
 [project.urls]
