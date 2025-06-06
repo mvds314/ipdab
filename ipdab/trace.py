@@ -84,9 +84,7 @@ class IPDBAdapterServer:
             elif cmd == "continue":
                 print("[DAP] Continue received")
                 self.debugger.set_continue()
-                await self.send_event(
-                    {"event": "continued", "body": {"threadId": 1, "allThreadsContinued": True}}
-                )
+                response["body"] = {}
             elif cmd == "pause":
                 print("[DAP] Pause received")
                 self.debugger.set_trace()
@@ -99,31 +97,16 @@ class IPDBAdapterServer:
             elif cmd == "stepIn":
                 print("[DAP] StepIn received")
                 self.debugger.set_step()
-                await self.send_event(
-                    {
-                        "event": "stopped",
-                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
-                    }
-                )
+                response["body"] = {}
             elif cmd == "stepOut":
                 print("[DAP] StepOut received")
                 if hasattr(self.debugger, "set_return"):
                     self.debugger.set_return()
-                await self.send_event(
-                    {
-                        "event": "stopped",
-                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
-                    }
-                )
+                response["body"] = {}
             elif cmd == "next":
                 print("[DAP] Next received")
                 self.debugger.set_next()
-                await self.send_event(
-                    {
-                        "event": "stopped",
-                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
-                    }
-                )
+                response["body"] = {}
             elif cmd == "configurationDone":
                 print("[DAP] Configuration done received")
                 response["body"] = {}
