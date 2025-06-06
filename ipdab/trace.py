@@ -188,7 +188,6 @@ class IPDBAdapterServer:
                         },
                     ]
                 }
-
             elif cmd == "variables":
                 print("[DAP] Variables request received")
                 variables_ref = msg.get("arguments", {}).get("variablesReference")
@@ -217,7 +216,6 @@ class IPDBAdapterServer:
                                 variables.append(
                                     {"name": k, "value": "<unreprable>", "variablesReference": 0}
                                 )
-
                 response["body"] = {"variables": variables}
             elif cmd == "evaluate":
                 expr = msg.get("arguments", {}).get("expression", "")
