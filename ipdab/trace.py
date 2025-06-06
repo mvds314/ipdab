@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 # import pdb
 from IPython.terminal.debugger import TerminalPdb
@@ -16,6 +17,7 @@ class IPDBAdapterServer:
         self.debugger = TerminalPdb()
         self.client_writer = None
         self.client_reader = None
+        self._shutdown_event = threading.Event()
 
     async def read_dap_message(self, reader):
         # Read headers until blank line
