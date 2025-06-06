@@ -6,32 +6,34 @@ from IPython.terminal.debugger import TerminalPdb
 class Debugger:
     def __init__(self, backend="ipdb", stopped_callback=None):
         backend = backend.lower()
+        self.stopped_callback = stopped_callback
         if backend == "ipdb":
+            parent = self
 
             class CustomTerminalPdb(TerminalPdb):
                 def user_line(inner_self, frame):
                     super().user_line(frame)
-                    if stopped_callback:
-                        asyncio.run_coroutine_threadsafe(
-                            stopped_callback(reason="breakpoint"), asyncio.get_event_loop()
-                        )
+                    parent._on_stop(frame)
 
-            self.debugger = TerminalPdb()
+            self.debugger = CustomTerminalPdb()
         elif backend == "pdb":
+            parent = self
 
             class CustomPdb(pdb.Pdb):
                 def user_line(inner_self, frame):
                     super().user_line(frame)
-                    if stopped_callback:
-                        asyncio.run_coroutine_threadsafe(
-                            stopped_callback(reason="breakpoint"), asyncio.get_event_loop()
-                        )
+                    parent._on_stop(frame)
 
             self.debugger = CustomPdb()
         else:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
         self.backend = backend
-        self.stopped_callback = stopped_callback
+
+    def _on_stop(self, frame):
+        self.debugger.curframe = frame
+        if self.stopped_callback:
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="breakpoint"), loop)
 
     def set_trace(self):
         self.debugger.set_trace()
@@ -43,7 +45,8 @@ class Debugger:
         self.debugger.set_step()
 
     def set_next(self):
-        self.debugger.set_next()
+        if self.curframe:
+            self.debugger.set_next(self.curframe)
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
