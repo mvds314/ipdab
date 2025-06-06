@@ -2,13 +2,15 @@ import pdb
 from IPython.terminal.debugger import TerminalPdb
 
 
-class DebuggerWrapper:
-    def __init__(self, debugger_name="ipdb"):
-        self._debugger_name = debugger_name
-        if debugger_name == "ipdb":
+class Debugger:
+    def __init__(self, name="ipdb"):
+        if name == "ipdb":
             self.debugger = TerminalPdb()
-        else:
+        elif name == "pdb":
             self.debugger = pdb.Pdb()
+        else:
+            raise ValueError(f"Unsupported debugger: {name}. Use 'ipdb' or 'pdb'.")
+        self.name = name.lower()
 
     def set_trace(self):
         self.debugger.set_trace()
