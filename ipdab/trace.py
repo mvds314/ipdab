@@ -200,23 +200,43 @@ class IPDBAdapterServer:
                 source = args.get("source", {})
                 path = source.get("path", "")
                 breakpoints = args.get("breakpoints", [])
-
                 # Clear old breakpoints in the file
                 if path in self.debugger.get_all_breaks():
                     for bp_line in self.debugger.get_all_breaks()[path]:
                         self.debugger.clear_break(path, bp_line)
-
                 actual_bps = []
                 for bp in breakpoints:
                     line = bp.get("line")
                     if line:
                         self.debugger.set_break(path, line)
                         actual_bps.append({"verified": True, "line": line})
-
                 response["body"] = {"breakpoints": actual_bps}
+            elif cmd == "setExceptionBreakpoints":
+                # You can store exception breakpoints info if needed or just acknowledge
+                response["body"] = {}
+                # For now, just acknowledge success; real implementation would configure exception breakpoints in debugger
+            elif cmd == "source":
+                args = msg.get("arguments", {})
+                # For simplicity, handle only file path sources (no binary or compiled sources)
+                if "path" in args.get("source", {}):
+                    path = args["source"]["path"]
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        response["body"] = {"content": content}
+                    except Exception as e:
+                        response["success"] = False
+                        response["message"] = f"Failed to read source: {e}"
+                else:
+                    response["success"] = False
+                    response["message"] = "Unsupported source reference"
+            elif cmd == "disassemble":
+                response["success"] = False
+                response["message"] = "Disassemble not supported in this debugger"
             else:
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
+                print(f"[DAP] Unsupported command received: {cmd}")
             writer.write(self.encode_dap_message(response))
             await writer.drain()
             print(f"[DAP] Sent response: {response}")
