@@ -59,18 +59,15 @@ class IPDBAdapterServer:
         print("[DAP] Client connected")
         self.client_writer = writer
         self.client_reader = reader
-
         while True:
             try:
                 msg = await self.read_dap_message(reader)
             except Exception as e:
                 print(f"[DAP] Error reading message: {e}")
                 break
-
             if msg is None:
                 print("[DAP] Client disconnected")
                 break
-
             print(f"[DAP] Received: {msg}")
             response = {
                 "type": "response",
@@ -79,66 +76,55 @@ class IPDBAdapterServer:
                 "success": True,
                 "command": msg.get("command", ""),
             }
-
             cmd = msg.get("command")
-
             if cmd == "initialize":
                 response["body"] = {"supportsConfigurationDoneRequest": True}
-
             elif cmd == "launch":
                 response["body"] = {}
-
                 await self.send_event({"event": "initialized", "body": {}})
-
             elif cmd == "continue":
                 print("[DAP] Continue received")
                 # Resume ipdb execution
                 self.debugger.set_continue()
                 # Notify client that execution has resumed
-                await self.send_event("continued", {"threadId": 1, "allThreadsContinued": True})
-
+                await self.send_event(
+                    {"event": "continued", "body": {"threadId": 1, "allThreadsContinued": True}}
+                )
             elif cmd == "pause":
                 print("[DAP] Pause received")
                 # Pause ipdb — simulate with set_trace() to drop in prompt
                 self.debugger.set_trace()
                 await self.send_event(
-                    "stopped",
                     {
                         "reason": "pause",
                         "threadId": 1,
                         "allThreadsStopped": True,
                     },
                 )
-
             elif cmd == "stepIn":
                 print("[DAP] StepIn received")
                 self.debugger.set_step()
                 await self.send_event(
-                    "stopped",
                     {
                         "reason": "step",
                         "threadId": 1,
                         "allThreadsStopped": True,
                     },
                 )
-
             elif cmd == "stepOut":
                 print("[DAP] StepOut received")
                 self.debugger.set_return()  # if your debugger supports it, or implement accordingly
                 await self.send_event(
-                    "stopped",
                     {
                         "reason": "step",
                         "threadId": 1,
                         "allThreadsStopped": True,
                     },
                 )
-
             elif cmd == "next":
                 print("[DAP] Next received")
                 self.debugger.set_next()
                 await self.send_event(
-                    "stopped",
                     {
                         "reason": "step",
                         "threadId": 1,
@@ -160,6 +146,9 @@ class IPDBAdapterServer:
                         },
                     }
                 )
+            elif cmd == "threads":
+                print("[DAP] Threads request received")
+                response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
             elif cmd == "evaluate":
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
@@ -170,7 +159,6 @@ class IPDBAdapterServer:
                     response["body"] = {"result": str(result), "variablesReference": 0}
                 except Exception as e:
                     response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
-
             elif cmd == "setBreakpoints":
                 args = msg.get("arguments", {})
                 source = args.get("source", {})
@@ -190,15 +178,12 @@ class IPDBAdapterServer:
                         actual_bps.append({"verified": True, "line": line})
 
                 response["body"] = {"breakpoints": actual_bps}
-
             else:
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
-
             writer.write(self.encode_dap_message(response))
             await writer.drain()
             print(f"[DAP] Sent response: {response}")
-
         writer.close()
         await writer.wait_closed()
 
