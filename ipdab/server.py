@@ -52,16 +52,12 @@ async def handle_dap_client(reader, writer):
 
         if cmd == "initialize":
             response["body"] = {"supportsConfigurationDoneRequest": True}
-
         elif cmd == "launch":
             response["body"] = {}
-
         elif cmd == "continue":
             print("[DAP] Continue received (script must control ipdb)")
-
         elif cmd == "pause":
             print("[DAP] Pause received — signal script externally if needed")
-
         elif cmd == "evaluate":
             expr = msg.get("arguments", {}).get("expression", "")
             try:
@@ -69,7 +65,10 @@ async def handle_dap_client(reader, writer):
                 response["body"] = {"result": str(result), "variablesReference": 0}
             except Exception as e:
                 response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
-
+        elif cmd == "attach":
+            # For now, just respond with failure, or a simple message
+            response["success"] = False
+            response["message"] = "Attach not supported yet"
         else:
             response["success"] = False
             response["message"] = f"Unsupported command: {cmd}"
