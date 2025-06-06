@@ -149,6 +149,76 @@ class IPDBAdapterServer:
             elif cmd == "threads":
                 print("[DAP] Threads request received")
                 response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
+            elif cmd == "stackTrace":
+                print("[DAP] StackTrace request received")
+                frame = self.debugger.curframe
+                if frame is not None:
+                    response["body"] = {
+                        "stackFrames": [
+                            {
+                                "id": 1,
+                                "name": frame.f_code.co_name,
+                                "line": frame.f_lineno,
+                                "column": 1,
+                                "source": {
+                                    "path": frame.f_code.co_filename,
+                                    "name": frame.f_code.co_filename.split("/")[-1],
+                                },
+                            }
+                        ],
+                        "totalFrames": 1,
+                    }
+                else:
+                    response["body"] = {"stackFrames": [], "totalFrames": 0}
+
+            elif cmd == "scopes":
+                print("[DAP] Scopes request received")
+                # Frame ID maps to scopes, 0 = globals, 1 = locals
+                response["body"] = {
+                    "scopes": [
+                        {
+                            "name": "Locals",
+                            "variablesReference": 100,
+                            "expensive": False,
+                        },
+                        {
+                            "name": "Globals",
+                            "variablesReference": 101,
+                            "expensive": True,
+                        },
+                    ]
+                }
+
+            elif cmd == "variables":
+                print("[DAP] Variables request received")
+                variables_ref = msg.get("arguments", {}).get("variablesReference")
+                frame = self.debugger.curframe
+                variables = []
+
+                if frame:
+                    if variables_ref == 100:  # Locals
+                        for k, v in frame.f_locals.items():
+                            try:
+                                variables.append(
+                                    {"name": k, "value": repr(v), "variablesReference": 0}
+                                )
+                            except Exception:
+                                variables.append(
+                                    {"name": k, "value": "<unreprable>", "variablesReference": 0}
+                                )
+
+                    elif variables_ref == 101:  # Globals
+                        for k, v in frame.f_globals.items():
+                            try:
+                                variables.append(
+                                    {"name": k, "value": repr(v), "variablesReference": 0}
+                                )
+                            except Exception:
+                                variables.append(
+                                    {"name": k, "value": "<unreprable>", "variablesReference": 0}
+                                )
+
+                response["body"] = {"variables": variables}
             elif cmd == "evaluate":
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
