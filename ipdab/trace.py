@@ -14,7 +14,7 @@ class IPDBAdapterServer:
         self.port = port
         self.server = None
         self.loop = None
-        self.debugger = Debugger(backend=debugger)
+        self.debugger = Debugger(backend=debugger, stopped_callback=self.notify_stopped)
         self.client_writer = None
         self.client_reader = None
         self._shutdown_event = threading.Event()
