@@ -20,7 +20,6 @@ class IPDBAdapterServer:
         self._shutdown_event = threading.Event()
 
     async def read_dap_message(self, reader):
-        # Read headers until blank line
         header = b""
         while not header.endswith(b"\r\n\r\n"):
             header += await reader.read(1)
@@ -84,66 +83,54 @@ class IPDBAdapterServer:
                 await self.send_event({"event": "initialized", "body": {}})
             elif cmd == "continue":
                 print("[DAP] Continue received")
-                # Resume ipdb execution
                 self.debugger.set_continue()
-                # Notify client that execution has resumed
                 await self.send_event(
                     {"event": "continued", "body": {"threadId": 1, "allThreadsContinued": True}}
                 )
             elif cmd == "pause":
                 print("[DAP] Pause received")
-                # Pause ipdb — simulate with set_trace() to drop in prompt
                 self.debugger.set_trace()
                 await self.send_event(
                     {
-                        "reason": "pause",
-                        "threadId": 1,
-                        "allThreadsStopped": True,
-                    },
+                        "event": "stopped",
+                        "body": {"reason": "pause", "threadId": 1, "allThreadsStopped": True},
+                    }
                 )
             elif cmd == "stepIn":
                 print("[DAP] StepIn received")
                 self.debugger.set_step()
                 await self.send_event(
                     {
-                        "reason": "step",
-                        "threadId": 1,
-                        "allThreadsStopped": True,
-                    },
+                        "event": "stopped",
+                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
+                    }
                 )
             elif cmd == "stepOut":
                 print("[DAP] StepOut received")
-                self.debugger.set_return()  # if your debugger supports it, or implement accordingly
+                if hasattr(self.debugger, "set_return"):
+                    self.debugger.set_return()
                 await self.send_event(
                     {
-                        "reason": "step",
-                        "threadId": 1,
-                        "allThreadsStopped": True,
-                    },
+                        "event": "stopped",
+                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
+                    }
                 )
             elif cmd == "next":
                 print("[DAP] Next received")
                 self.debugger.set_next()
                 await self.send_event(
                     {
-                        "reason": "step",
-                        "threadId": 1,
-                        "allThreadsStopped": True,
-                    },
+                        "event": "stopped",
+                        "body": {"reason": "step", "threadId": 1, "allThreadsStopped": True},
+                    }
                 )
             elif cmd == "configurationDone":
                 print("[DAP] Configuration done received")
                 response["body"] = {}
-
-                # Optional: Send a 'stopped' event to indicate the debugger is ready
                 await self.send_event(
                     {
                         "event": "stopped",
-                        "body": {
-                            "reason": "entry",
-                            "threadId": 1,
-                            "allThreadsStopped": True,
-                        },
+                        "body": {"reason": "entry", "threadId": 1, "allThreadsStopped": True},
                     }
                 )
             elif cmd == "threads":
@@ -151,71 +138,52 @@ class IPDBAdapterServer:
                 response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
             elif cmd == "stackTrace":
                 print("[DAP] StackTrace request received")
-                frame = self.debugger.curframe
-                if frame is not None:
-                    response["body"] = {
-                        "stackFrames": [
+                frames = []
+                if self.debugger.curframe:
+                    f = self.debugger.curframe
+                    i = 0
+                    while f and i < 20:
+                        code = f.f_code
+                        frames.append(
                             {
-                                "id": 1,
-                                "name": frame.f_code.co_name,
-                                "line": frame.f_lineno,
+                                "id": i,
+                                "name": code.co_name,
+                                "line": f.f_lineno,
                                 "column": 1,
-                                "source": {
-                                    "path": frame.f_code.co_filename,
-                                    "name": frame.f_code.co_filename.split("/")[-1],
-                                },
+                                "source": {"path": code.co_filename},
                             }
-                        ],
-                        "totalFrames": 1,
-                    }
-                else:
-                    response["body"] = {"stackFrames": [], "totalFrames": 0}
-
+                        )
+                        f = f.f_back
+                        i += 1
+                response["body"] = {"stackFrames": frames, "totalFrames": len(frames)}
             elif cmd == "scopes":
                 print("[DAP] Scopes request received")
-                # Frame ID maps to scopes, 0 = globals, 1 = locals
+                frame_id = msg.get("arguments", {}).get("frameId", 0)
                 response["body"] = {
                     "scopes": [
                         {
                             "name": "Locals",
-                            "variablesReference": 100,
+                            "variablesReference": 1000 + frame_id,
                             "expensive": False,
                         },
                         {
                             "name": "Globals",
-                            "variablesReference": 101,
+                            "variablesReference": 2000 + frame_id,
                             "expensive": True,
                         },
                     ]
                 }
             elif cmd == "variables":
                 print("[DAP] Variables request received")
-                variables_ref = msg.get("arguments", {}).get("variablesReference")
+                var_ref = msg.get("arguments", {}).get("variablesReference", 0)
                 frame = self.debugger.curframe
                 variables = []
-
-                if frame:
-                    if variables_ref == 100:  # Locals
-                        for k, v in frame.f_locals.items():
-                            try:
-                                variables.append(
-                                    {"name": k, "value": repr(v), "variablesReference": 0}
-                                )
-                            except Exception:
-                                variables.append(
-                                    {"name": k, "value": "<unreprable>", "variablesReference": 0}
-                                )
-
-                    elif variables_ref == 101:  # Globals
-                        for k, v in frame.f_globals.items():
-                            try:
-                                variables.append(
-                                    {"name": k, "value": repr(v), "variablesReference": 0}
-                                )
-                            except Exception:
-                                variables.append(
-                                    {"name": k, "value": "<unreprable>", "variablesReference": 0}
-                                )
+                if 1000 <= var_ref < 2000 and frame:
+                    for k, v in frame.f_locals.items():
+                        variables.append({"name": k, "value": repr(v), "variablesReference": 0})
+                elif var_ref >= 2000 and frame:
+                    for k, v in frame.f_globals.items():
+                        variables.append({"name": k, "value": repr(v), "variablesReference": 0})
                 response["body"] = {"variables": variables}
             elif cmd == "evaluate":
                 expr = msg.get("arguments", {}).get("expression", "")
