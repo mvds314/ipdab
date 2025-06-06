@@ -31,22 +31,71 @@ class Debugger:
 
     def _on_stop(self, frame):
         self.debugger.curframe = frame
+        print("[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno)
         if self.stopped_callback:
             loop = asyncio.get_event_loop()
             asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="breakpoint"), loop)
+            print("[DEBUGGER] Stopped callback executed.")
+        else:
+            print("[DEBUGGER] No stopped callback set, continuing without notification.")
 
     def set_trace(self):
         self.debugger.set_trace()
+        print("[DEBUGGER] Stepping into the next line.")
 
     def set_continue(self):
         self.debugger.set_continue()
+        print("[DEBUGGER] Continuing execution.")
+        if self.stopped_callback:
+            asyncio.run_coroutine_threadsafe(
+                self.stopped_callback(reason="continued"),
+                asyncio.get_event_loop(),
+            )
+            print("[DEBUGGER] Stopped callback executed after continue.")
+        else:
+            print("[DEBUGGER] No stopped callback set, continuing without notification.")
 
     def set_step(self):
         self.debugger.set_step()
+        print("[DEBUGGER] Stepping into the next line.")
+        if self.stopped_callback:
+            print("[DEBUGGER] Notifying stopped callback after step.")
+            asyncio.run_coroutine_threadsafe(
+                self.stopped_callback(reason="step"),
+                asyncio.get_event_loop(),
+            )
+        else:
+            print("[DEBUGGER] No stopped callback set, continuing without notification.")
 
     def set_next(self):
         if self.curframe:
             self.debugger.set_next(self.curframe)
+            print("[DEBUGGER] Stepping over to the next line.")
+        else:
+            print("[DEBUGGER] No current frame to step over.")
+        # After stepping, notify your DAP server to send a stopped event
+        if self.stopped_callback:
+            # Run the callback asynchronously
+            asyncio.run_coroutine_threadsafe(
+                self.stopped_callback(reason="step"),
+                asyncio.get_event_loop(),
+            )
+            print("[DEBUGGER] Stopped callback executed after stepping over.")
+        else:
+            print("[DEBUGGER] No stopped callback set, continuing without notification.")
+
+    def set_return(self):
+        if self.curframe:
+            self.debugger.set_return(self.curframe)
+            print("[DEBUGGER] Returning from the current frame.")
+        else:
+            print("[DEBUGGER] No current frame to return from.")
+        if self.stopped_callback:
+            print("[DEBUGGER] Notifying stopped callback after return.")
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="step"), loop)
+        else:
+            print("[DEBUGGER] No stopped callback set, continuing without notification.")
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
