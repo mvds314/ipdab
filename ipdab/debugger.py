@@ -17,13 +17,14 @@ class Debugger:
                         "[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno
                     )
                     try:
-                        super().user_line(frame)
                         parent._on_stop(frame)
+                        super().user_line(frame)
                     except Exception as e:
                         print(f"[DEBUGGER] Error in user_line: {e}")
 
             self.debugger = CustomTerminalPdb()
         elif backend == "pdb":
+            raise NotImplementedError()
             parent = self
 
             class CustomPdb(pdb.Pdb):
@@ -32,8 +33,8 @@ class Debugger:
                         "[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno
                     )
                     try:
-                        super().user_line(frame)
                         parent._on_stop(frame)
+                        super().user_line(frame)
                     except Exception as e:
                         print(f"[DEBUGGER] Error in user_line: {e}")
 
