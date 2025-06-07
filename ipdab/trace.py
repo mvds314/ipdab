@@ -13,8 +13,10 @@ class IPDBAdapterServer:
         self.host = host
         self.port = port
         self.server = None
-        self.loop = None
-        self.debugger = Debugger(backend=debugger, stopped_callback=self.notify_stopped)
+        self.loop = asyncio.new_event_loop()
+        self.debugger = Debugger(
+            backend=debugger, stopped_callback=self.notify_stopped, loop=self.loop
+        )
         self.client_writer = None
         self.client_reader = None
         self._shutdown_event = threading.Event()
@@ -43,6 +45,7 @@ class IPDBAdapterServer:
 
     async def notify_stopped(self, reason="breakpoint"):
         if self.client_writer:
+            print(f"[DAP] Notifying stopped: {reason}")
             await self.send_event(
                 {
                     "event": "stopped",
@@ -53,6 +56,8 @@ class IPDBAdapterServer:
                     },
                 }
             )
+        else:
+            print(f"[DAP] Notified stopped: {reason} (no client connected)")
 
     async def handle_client(self, reader, writer):
         print("[DAP] Client connected")
@@ -239,7 +244,6 @@ class IPDBAdapterServer:
             self.loop.call_soon_threadsafe(self.loop.stop)
 
     def _run_loop(self):
-        self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_until_complete(self.start_server())
