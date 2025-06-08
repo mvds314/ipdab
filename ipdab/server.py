@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import threading
 import time
 
@@ -41,11 +42,11 @@ class IPDBAdapterServer:
         event_msg = {"type": "event", "seq": 0, **event_body}
         self.client_writer.write(self.encode_dap_message(event_msg))
         await self.client_writer.drain()
-        print(f"[DAP] Sent event: {event_msg}")
+        logging.debug(f"[DAP] Sent event: {event_msg}")
 
     async def notify_stopped(self, reason="breakpoint"):
         if self.client_writer:
-            print(f"[DAP] Notifying stopped: {reason}")
+            logging.debug(f"[DAP] Notifying stopped: {reason}")
             await self.send_event(
                 {
                     "event": "stopped",
@@ -57,22 +58,22 @@ class IPDBAdapterServer:
                 }
             )
         else:
-            print(f"[DAP] Notified stopped: {reason} (no client connected)")
+            logging.debug(f"[DAP] No client connected, cannot notify stopped: {reason}")
 
     async def handle_client(self, reader, writer):
-        print("[DAP] Client connected")
+        logging.info("[DAP] New client connection")
         self.client_writer = writer
         self.client_reader = reader
         while True:
             try:
                 msg = await self.read_dap_message(reader)
             except Exception as e:
-                print(f"[DAP] Error reading message: {e}")
+                logging.error(f"[DAP] Error reading message: {e}")
                 break
             if msg is None:
-                print("[DAP] Client disconnected")
+                logging.info("[DAP] Client disconnected")
                 break
-            print(f"[DAP] Received: {msg}")
+            logging.debug(f"[DAP] Received message: {msg}")
             response = {
                 "type": "response",
                 "seq": msg.get("seq", 0),
@@ -82,16 +83,18 @@ class IPDBAdapterServer:
             }
             cmd = msg.get("command")
             if cmd == "initialize":
+                logging.info("[DAP] Initialize command received")
                 response["body"] = {"supportsConfigurationDoneRequest": True}
             elif cmd == "launch":
+                logging.info("[DAP] Launch command received, initializing debugger")
                 response["body"] = {}
                 await self.send_event({"event": "initialized", "body": {}})
             elif cmd == "continue":
-                print("[DAP] Continue received")
+                logging.info("[DAP] Continue command received, resuming debugger")
                 self.debugger.set_continue()
                 response["body"] = {}
             elif cmd == "pause":
-                print("[DAP] Pause received")
+                logging.info("[DAP] Pause command received, pausing debugger")
                 self.debugger.set_trace()
                 await self.send_event(
                     {
@@ -100,20 +103,20 @@ class IPDBAdapterServer:
                     }
                 )
             elif cmd == "stepIn":
-                print("[DAP] StepIn received")
+                logging.info("[DAP] StepIn command received")
                 self.debugger.set_step()
                 response["body"] = {}
             elif cmd == "stepOut":
-                print("[DAP] StepOut received")
+                logging.info("[DAP] StepOut command received")
                 if hasattr(self.debugger, "set_return"):
                     self.debugger.set_return()
                 response["body"] = {}
             elif cmd == "next":
-                print("[DAP] Next received")
+                logging.info("[DAP] Next command received")
                 self.debugger.set_next()
                 response["body"] = {}
             elif cmd == "configurationDone":
-                print("[DAP] Configuration done received")
+                logging.info("[DAP] ConfigurationDone command received")
                 response["body"] = {}
                 await self.send_event(
                     {
@@ -122,10 +125,10 @@ class IPDBAdapterServer:
                     }
                 )
             elif cmd == "threads":
-                print("[DAP] Threads request received")
+                logging.info("[DAP] Threads command received")
                 response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
             elif cmd == "stackTrace":
-                print("[DAP] StackTrace request received")
+                logging.info("[DAP] StackTrace command received")
                 frames = []
                 if self.debugger.curframe:
                     f = self.debugger.curframe
@@ -145,7 +148,7 @@ class IPDBAdapterServer:
                         i += 1
                 response["body"] = {"stackFrames": frames, "totalFrames": len(frames)}
             elif cmd == "scopes":
-                print("[DAP] Scopes request received")
+                logging.info("[DAP] Scopes command received")
                 frame_id = msg.get("arguments", {}).get("frameId", 0)
                 response["body"] = {
                     "scopes": [
@@ -162,7 +165,7 @@ class IPDBAdapterServer:
                     ]
                 }
             elif cmd == "variables":
-                print("[DAP] Variables request received")
+                logging.info("[DAP] Variables command received")
                 var_ref = msg.get("arguments", {}).get("variablesReference", 0)
                 frame = self.debugger.curframe
                 variables = []
@@ -224,21 +227,21 @@ class IPDBAdapterServer:
             else:
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
-                print(f"[DAP] Unsupported command received: {cmd}")
+                logging.warning(f"[DAP] Unsupported command: {cmd}")
             writer.write(self.encode_dap_message(response))
             await writer.drain()
-            print(f"[DAP] Sent response: {response}")
+            logging.debug(f"[DAP] Sent response: {response}")
         writer.close()
         await writer.wait_closed()
 
     async def start_server(self):
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
-        print(f"[Adapter] DAP server listening on {self.host}:{self.port}")
+        logging.debug(f"[Adapter] DAP server listening on {self.host}:{self.port}")
         async with self.server:
             await self.server.serve_forever()
 
     def shutdown(self):
-        print("[Adapter] Shutdown initiated")
+        logging.info("[Adapter] Shutting down DAP server")
         self._shutdown_event.set()
         if self.loop:
             self.loop.call_soon_threadsafe(self.loop.stop)
@@ -250,9 +253,9 @@ class IPDBAdapterServer:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            print(f"[Adapter] Event loop exception: {e}")
+            logging.error(f"[Adapter] Event loop exception: {e}")
         finally:
-            print("[Adapter] Event loop stopping")
+            logging.debug("[Adapter] Event loop stopping")
             try:
                 self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             finally:
@@ -279,6 +282,11 @@ def set_trace():
 if __name__ == "__main__":
     # Simple example usage:
     import time
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
 
     print("Starting debug adapter server...")
     ipdab.start_in_thread()

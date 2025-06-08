@@ -1,5 +1,7 @@
-import pdb
 import asyncio
+import logging
+import pdb
+
 from IPython import get_ipython
 from IPython.terminal.debugger import TerminalPdb
 
@@ -15,14 +17,14 @@ class Debugger:
 
             class CustomTerminalPdb(TerminalPdb):
                 def user_line(inner_self, frame):
-                    print(
-                        "[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno
+                    logging.debug(
+                        f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
                     )
                     try:
                         parent._on_stop(frame)
                         super().user_line(frame)
                     except Exception as e:
-                        print(f"[DEBUGGER] Error in user_line: {e}")
+                        logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
             self.debugger = CustomTerminalPdb()
         elif backend == "pdb":
@@ -31,14 +33,14 @@ class Debugger:
 
             class CustomPdb(pdb.Pdb):
                 def user_line(inner_self, frame):
-                    print(
-                        "[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno
+                    logging.debug(
+                        f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
                     )
                     try:
                         parent._on_stop(frame)
                         super().user_line(frame)
                     except Exception as e:
-                        print(f"[DEBUGGER] Error in user_line: {e}")
+                        logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
             self.debugger = CustomPdb()
         else:
@@ -48,41 +50,41 @@ class Debugger:
     def send_to_terminal(self, command):
         if not self.shell:
             raise RuntimeError("No active IPython shell found")
-        print(f"[DEBUGGER] Sending command to terminal: {command}")
+        logging.debug(f"[DEBUGGER] Sending command to terminal: {command}")
         self.shell.run_cell(f"!{command}", store_history=False)
 
     def _on_stop(self, frame):
         self.debugger.curframe = frame
-        print("[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno)
+        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
         if self.stopped_callback:
             loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.stopped_callback):
                 asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="breakpoint"), loop)
             else:
                 self.stopped_callback(reason="breakpoint")
-            print("[DEBUGGER] Stopped callback executed.")
+            logging.debug("[DEBUGGER] Stopped callback executed.")
         else:
-            print("[DEBUGGER] No stopped callback set, continuing without notification.")
+            logging.debug("[DEBUGGER] No stopped callback set, continuing without notification.")
 
     def set_trace(self):
+        logging.debug("[DEBUGGER] Trace set, entering debugger.")
         self.debugger.set_trace()
-        print("[DEBUGGER] Stepping into the next line.")
 
     def set_continue(self):
+        logging.debug("[DEBUGGER] Continue command issued.")
         self.debugger.onecmd("continue")
-        print("[DEBUGGER] Continuing execution.")
 
     def set_step(self):
+        logging.debug("[DEBUGGER] Step command issued.")
         self.debugger.onecmd("step")
-        print("[DEBUGGER] Stepping into the next line.")
 
     def set_next(self):
+        logging.debug("[DEBUGGER] Next command issued.")
         self.debugger.onecmd("next")
-        print("[DEBUGGER] Stepping over to the next line.")
 
     def set_return(self):
+        logging.debug("[DEBUGGER] Return command issued.")
         self.debugger.onecmd("return")
-        print("[DEBUGGER] Returning from the current frame.")
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
