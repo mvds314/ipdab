@@ -177,6 +177,7 @@ class IPDBAdapterServer:
                         variables.append({"name": k, "value": repr(v), "variablesReference": 0})
                 response["body"] = {"variables": variables}
             elif cmd == "evaluate":
+                logging.info("[DAP] Evaluate command received")
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
                     # Evaluate expression in ipdb debugger context
@@ -187,6 +188,7 @@ class IPDBAdapterServer:
                 except Exception as e:
                     response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
             elif cmd == "setBreakpoints":
+                logging.info("[DAP] SetBreakpoints command received")
                 args = msg.get("arguments", {})
                 source = args.get("source", {})
                 path = source.get("path", "")
@@ -203,10 +205,12 @@ class IPDBAdapterServer:
                         actual_bps.append({"verified": True, "line": line})
                 response["body"] = {"breakpoints": actual_bps}
             elif cmd == "setExceptionBreakpoints":
+                logging.info("[DAP] SetExceptionBreakpoints command received")
                 # You can store exception breakpoints info if needed or just acknowledge
                 response["body"] = {}
                 # For now, just acknowledge success; real implementation would configure exception breakpoints in debugger
             elif cmd == "source":
+                logging.info("[DAP] Source command received")
                 args = msg.get("arguments", {})
                 # For simplicity, handle only file path sources (no binary or compiled sources)
                 if "path" in args.get("source", {}):
@@ -222,9 +226,11 @@ class IPDBAdapterServer:
                     response["success"] = False
                     response["message"] = "Unsupported source reference"
             elif cmd == "disassemble":
+                logging.info("[DAP] Disassemble command received")
                 response["success"] = False
                 response["message"] = "Disassemble not supported in this debugger"
             else:
+                logging.warning(f"[DAP] Unsupported command: {cmd}")
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
                 logging.warning(f"[DAP] Unsupported command: {cmd}")
@@ -266,7 +272,10 @@ class IPDBAdapterServer:
 
     def set_trace(self):
         if not self.server:
+            logging.debug("[Adapter] Starting DAP server in a new thread")
             self.start_in_thread()
+        else:
+            logging.debug("[Adapter] DAP server already running, setting trace")
         # Enter ipdb prompt here
         self.debugger.set_trace()
 
@@ -276,6 +285,7 @@ ipdab = IPDBAdapterServer()
 
 
 def set_trace():
+    logging.info("[Adapter] Setting trace in IPDB adapter")
     ipdab.set_trace()
 
 
