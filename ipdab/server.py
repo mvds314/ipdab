@@ -21,13 +21,6 @@ class IPDBAdapterServer:
         self.client_reader = None
         self._shutdown_event = threading.Event()
 
-    def send_to_terminal(self, code):
-        ip = get_ipython()
-        if ip is not None:
-            ip.run_cell(code)
-        else:
-            print("[ERROR] IPython shell not available")
-
     async def read_dap_message(self, reader):
         header = b""
         while not header.endswith(b"\r\n\r\n"):

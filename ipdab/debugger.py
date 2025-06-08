@@ -1,5 +1,6 @@
 import pdb
 import asyncio
+from IPython import get_ipython
 from IPython.terminal.debugger import TerminalPdb
 
 
@@ -8,6 +9,7 @@ class Debugger:
         backend = backend.lower()
         self.stopped_callback = stopped_callback
         self.loop = loop
+        self.shell = get_ipython()
         if backend == "ipdb":
             parent = self
 
@@ -43,6 +45,12 @@ class Debugger:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
         self.backend = backend
 
+    def send_to_terminal(self, command):
+        if not self.shell:
+            raise RuntimeError("No active IPython shell found")
+        print(f"[DEBUGGER] Sending command to terminal: {command}")
+        self.shell.run_cell(f"!{command}", store_history=False)
+
     def _on_stop(self, frame):
         self.debugger.curframe = frame
         print("[DEBUGGER] Stopped at:", frame.f_code.co_filename, "line", frame.f_lineno)
@@ -61,26 +69,20 @@ class Debugger:
         print("[DEBUGGER] Stepping into the next line.")
 
     def set_continue(self):
-        self.debugger.set_continue()
+        self.debugger.onecmd("continue")
         print("[DEBUGGER] Continuing execution.")
 
     def set_step(self):
-        self.debugger.set_step()
+        self.debugger.onecmd("step")
         print("[DEBUGGER] Stepping into the next line.")
 
     def set_next(self):
-        if self.curframe:
-            self.debugger.set_next(self.curframe)
-            print("[DEBUGGER] Stepping over to the next line.")
-        else:
-            print("[DEBUGGER] No current frame to step over.")
+        self.debugger.onecmd("next")
+        print("[DEBUGGER] Stepping over to the next line.")
 
     def set_return(self):
-        if self.curframe:
-            self.debugger.set_return(self.curframe)
-            print("[DEBUGGER] Returning from the current frame.")
-        else:
-            print("[DEBUGGER] No current frame to return from.")
+        self.debugger.onecmd("return")
+        print("[DEBUGGER] Returning from the current frame.")
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
