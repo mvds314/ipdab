@@ -70,22 +70,6 @@ class Debugger:
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
         self.debugger.set_trace()
 
-    def set_continue(self):
-        logging.debug("[DEBUGGER] Continue command issued.")
-        self.debugger.onecmd("continue")
-
-    def set_step(self):
-        logging.debug("[DEBUGGER] Step command issued.")
-        self.debugger.onecmd("step")
-
-    def set_next(self):
-        logging.debug("[DEBUGGER] Next command issued.")
-        self.debugger.onecmd("next")
-
-    def set_return(self):
-        logging.debug("[DEBUGGER] Return command issued.")
-        self.debugger.onecmd("return")
-
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
             return self.debugger.get_all_breaks()
