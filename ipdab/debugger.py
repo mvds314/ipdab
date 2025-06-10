@@ -6,75 +6,95 @@ from IPython import get_ipython
 from IPython.terminal.debugger import TerminalPdb
 
 
+class CustomTerminalPdb(TerminalPdb):
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._parent = parent
+
+    def user_line(self, frame):
+        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
+        try:
+            self._parent._on_stop(frame)
+            super().user_line(frame)
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in user_line: {e}")
+
+    def postcmd(self, stop, line):
+        try:
+            if line.strip() in {"n", "s", "step", "next"}:
+                self._parent._on_stop(self.curframe)
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in postcmd: {e}")
+        return super().postcmd(stop, line)
+
+    def do_quit(self, arg):
+        logging.debug("[DEBUGGER] Quit command received")
+        try:
+            self._parent._on_exit()
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in on_exit: {e}")
+        return super().do_quit(arg)
+
+
+class CustomPdb(pdb.Pdb):
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._parent = parent
+
+    def user_line(self, frame):
+        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
+        try:
+            self._parent._on_stop(frame)
+            super().user_line(frame)
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in user_line: {e}")
+
+    def postcmd(self, stop, line):
+        try:
+            if line.strip() in {"n", "s", "step", "next"}:
+                self._parent._on_stop(self.curframe)
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in postcmd: {e}")
+        return super().postcmd(stop, line)
+
+    def do_quit(self, arg):
+        logging.debug("[DEBUGGER] Quit command received")
+        try:
+            self._parent._on_exit()
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in on_exit: {e}")
+        return super().do_quit(arg)
+
+
 class Debugger:
-    def __init__(self, backend="ipdb", stopped_callback=None, loop=None):
+    def __init__(
+        self,
+        *args,
+        backend="ipdb",
+        stopped_callback=None,
+        loop=None,
+        exited_callback=None,
+        **kwargs,
+    ):
         backend = backend.lower()
         self.stopped_callback = stopped_callback
+        self.exited_callback = exited_callback
         self.loop = loop
         self.shell = get_ipython()
+
         if backend == "ipdb":
-            parent = self
-
-            class CustomTerminalPdb(TerminalPdb):
-                def user_line(inner_self, frame):
-                    """
-                    Called after set_trace()
-                    """
-                    logging.debug(
-                        f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
-                    )
-                    try:
-                        parent._on_stop(frame)
-                        super().user_line(frame)
-                    except Exception as e:
-                        logging.error(f"[DEBUGGER] Error in user_line: {e}")
-
-                def postcmd(inner_self, stop, line):
-                    """
-                    Called after each command execution in the terminal debugger.
-                    """
-                    try:
-                        if line.strip() in {"n", "s", "step", "next"}:
-                            parent._on_stop(inner_self.curframe)
-                    except Exception as e:
-                        logging.error(f"[DEBUGGER] Error in postcmd: {e}")
-                    return super().postcmd(stop, line)
-
-            self.debugger = CustomTerminalPdb()
+            self.debugger = CustomTerminalPdb(parent=self)
         elif backend == "pdb":
-            parent = self
-
-            class CustomPdb(pdb.Pdb):
-                def user_line(inner_self, frame):
-                    """
-                    Called after set_trace()
-                    """
-                    logging.debug(
-                        f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
-                    )
-                    try:
-                        parent._on_stop(frame)
-                        super().user_line(frame)
-                    except Exception as e:
-                        logging.error(f"[DEBUGGER] Error in user_line: {e}")
-
-                def postcmd(inner_self, stop, line):
-                    """
-                    Called after each command execution in the terminal debugger.
-                    """
-                    try:
-                        if line.strip() in {"n", "s", "step", "next"}:
-                            parent._on_stop(inner_self.curframe)
-                    except Exception as e:
-                        logging.error(f"[DEBUGGER] Error in postcmd: {e}")
-                    return super().postcmd(stop, line)
-
-            self.debugger = CustomPdb()
+            self.debugger = CustomPdb(parent=self)
         else:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
+
         self.backend = backend
 
     def send_to_terminal(self, command):
+        """
+        Sends a command to the terminal,
+        """
         if not self.shell:
             raise RuntimeError("No active IPython shell found")
         logging.debug(f"[DEBUGGER] Sending command to terminal: {command}")
@@ -92,6 +112,18 @@ class Debugger:
             logging.debug("[DEBUGGER] Stopped callback executed.")
         else:
             logging.debug("[DEBUGGER] No stopped callback set, continuing without notification.")
+
+    def _on_exit(self):
+        logging.debug("[DEBUGGER] Debugger is exiting")
+        if self.exited_callback:
+            loop = self.loop or asyncio.get_event_loop()
+            if asyncio.iscoroutinefunction(self.exited_callback):
+                asyncio.run_coroutine_threadsafe(self.exited_callback(reason="exited"), loop)
+            else:
+                self.exited_callback(reason="exited")
+            logging.debug("[DEBUGGER] Exited callback executed.")
+        else:
+            logging.debug("[DEBUGGER] No exited callback set.")
 
     def set_trace(self):
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
@@ -112,3 +144,4 @@ class Debugger:
     @property
     def curframe(self):
         return getattr(self.debugger, "curframe", None)
+
