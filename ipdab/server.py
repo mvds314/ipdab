@@ -4,8 +4,6 @@ import logging
 import threading
 import time
 
-from IPython import get_ipython
-
 from .debugger import Debugger
 
 
@@ -90,9 +88,9 @@ class IPDBAdapterServer:
                 response["body"] = {}
                 await self.send_event({"event": "initialized", "body": {}})
             elif cmd == "continue":
-                logging.info("[DAP] Continue command received, resuming debugger")
-                self.debugger.set_continue()
-                response["body"] = {}
+                logging.error("[DAP] Continue commands can only be send through terminal")
+                response["success"] = False
+                response["message"] = "Continue commands can only be sent through terminal"
             elif cmd == "pause":
                 logging.info("[DAP] Pause command received, pausing debugger")
                 self.debugger.set_trace()
@@ -103,18 +101,17 @@ class IPDBAdapterServer:
                     }
                 )
             elif cmd == "stepIn":
-                logging.info("[DAP] StepIn command received")
-                self.debugger.set_step()
-                response["body"] = {}
+                logging.error("[DAP] StepIn commands can only be send through terminal")
+                response["success"] = False
+                response["message"] = "StepIn commands can only be sent through terminal"
             elif cmd == "stepOut":
-                logging.info("[DAP] StepOut command received")
-                if hasattr(self.debugger, "set_return"):
-                    self.debugger.set_return()
-                response["body"] = {}
+                logging.error("[DAP] StepOut commands can only be send through terminal")
+                response["success"] = False
+                response["message"] = "StepOut commands can only be sent through terminal"
             elif cmd == "next":
-                logging.info("[DAP] Next command received")
-                self.debugger.set_next()
-                response["body"] = {}
+                logging.error("[DAP] Next commands can only be send through terminal")
+                response["success"] = False
+                response["message"] = "Next commands can only be sent through terminal"
             elif cmd == "configurationDone":
                 logging.info("[DAP] ConfigurationDone command received")
                 response["body"] = {}

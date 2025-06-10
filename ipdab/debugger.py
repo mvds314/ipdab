@@ -2,7 +2,6 @@ import asyncio
 import logging
 import pdb
 
-from IPython import get_ipython
 from IPython.terminal.debugger import TerminalPdb
 
 
@@ -80,7 +79,6 @@ class Debugger:
         self.stopped_callback = stopped_callback
         self.exited_callback = exited_callback
         self.loop = loop
-        self.shell = get_ipython()
 
         if backend == "ipdb":
             self.debugger = CustomTerminalPdb(parent=self)
@@ -90,15 +88,6 @@ class Debugger:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
 
         self.backend = backend
-
-    def send_to_terminal(self, command):
-        """
-        Sends a command to the terminal,
-        """
-        if not self.shell:
-            raise RuntimeError("No active IPython shell found")
-        logging.debug(f"[DEBUGGER] Sending command to terminal: {command}")
-        self.shell.run_cell(f"!{command}", store_history=False)
 
     def _on_stop(self, frame):
         self.debugger.curframe = frame
