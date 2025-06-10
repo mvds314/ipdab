@@ -16,6 +16,9 @@ class CustomDebugger(ABC):
     def __init__(self, parent):
         """
         Initialize the custom debugger with a parent reference.
+
+        Implementation should handle setting up the debugger
+
         :param parent: Reference to the parent object that will handle callbacks.
         """
         self._parent = parent
@@ -154,4 +157,3 @@ class Debugger:
     @property
     def curframe(self):
         return getattr(self.debugger, "curframe", None)
-
