@@ -34,6 +34,19 @@ class CustomTerminalPdb(TerminalPdb):
             logging.error(f"[DEBUGGER] Error in on_exit: {e}")
         return super().do_quit(arg)
 
+    def do_continue(self, arg):
+        logging.debug("[DEBUGGER] Continue command received")
+        # Run continue, and check if debugger session ended
+        try:
+            ret = super().do_continue(arg)
+            # If debugger finished (ret True), call _on_exit
+            if ret:
+                self._parent._on_exit()
+            return ret
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in do_continue: {e}")
+            raise
+
 
 class CustomPdb(pdb.Pdb):
     def __init__(self, parent, *args, **kwargs):
@@ -63,6 +76,19 @@ class CustomPdb(pdb.Pdb):
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in on_exit: {e}")
         return super().do_quit(arg)
+
+    def do_continue(self, arg):
+        logging.debug("[DEBUGGER] Continue command received")
+        # Run continue, and check if debugger session ended
+        try:
+            ret = super().do_continue(arg)
+            # If debugger finished (ret True), call _on_exit
+            if ret:
+                self._parent._on_exit()
+            return ret
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in do_continue: {e}")
+            raise
 
 
 class Debugger:
