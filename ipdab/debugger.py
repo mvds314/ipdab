@@ -1,16 +1,30 @@
 import asyncio
 import logging
 import pdb
+from abc import ABC, abstractmethod
 
 from IPython.terminal.debugger import TerminalPdb
 
 
-class CustomTerminalPdb(TerminalPdb):
-    def __init__(self, parent, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class CustomDebugger(ABC):
+    """
+    Base class for custom debuggers.
+    This class is abstract and should not be instantiated directly.
+    """
+
+    @abstractmethod
+    def __init__(self, parent):
+        """
+        Initialize the custom debugger with a parent reference.
+        :param parent: Reference to the parent object that will handle callbacks.
+        """
         self._parent = parent
 
     def user_line(self, frame):
+        """
+        Called when the debugger stops at a line of code.
+        :param frame: The current stack frame.
+        """
         logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
         try:
             self._parent._on_stop(frame)
@@ -48,47 +62,28 @@ class CustomTerminalPdb(TerminalPdb):
             raise
 
 
-class CustomPdb(pdb.Pdb):
+class CustomTerminalPdb(CustomDebugger, TerminalPdb):
+    """
+    Custom TerminalPdb that integrates with the parent Debugger class.
+    This class overrides methods to handle stopping and exiting events.
+    """
+
     def __init__(self, parent, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._parent = parent
+        CustomDebugger.__init__(self, parent)
+        TerminalPdb.__init__(self, *args, **kwargs)
+        logging.debug("[DEBUGGER] CustomTerminalPdb initialized")
 
-    def user_line(self, frame):
-        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
-        try:
-            self._parent._on_stop(frame)
-            super().user_line(frame)
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
-    def postcmd(self, stop, line):
-        try:
-            if line.strip() in {"n", "s", "step", "next"}:
-                self._parent._on_stop(self.curframe)
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in postcmd: {e}")
-        return super().postcmd(stop, line)
+class CustomPdb(CustomDebugger, pdb.Pdb):
+    """
+    Custom Pdb that integrates with the parent Debugger class.
+    This class overrides methods to handle stopping and exiting events.
+    """
 
-    def do_quit(self, arg):
-        logging.debug("[DEBUGGER] Quit command received")
-        try:
-            self._parent._on_exit()
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in on_exit: {e}")
-        return super().do_quit(arg)
-
-    def do_continue(self, arg):
-        logging.debug("[DEBUGGER] Continue command received")
-        # Run continue, and check if debugger session ended
-        try:
-            ret = super().do_continue(arg)
-            # If debugger finished (ret True), call _on_exit
-            if ret:
-                self._parent._on_exit()
-            return ret
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in do_continue: {e}")
-            raise
+    def __init__(self, parent, *args, **kwargs):
+        CustomDebugger.__init__(self, parent)
+        pdb.Pdb.__init__(self, *args, **kwargs)
+        logging.debug("[DEBUGGER] CustomPdb initialized")
 
 
 class Debugger:
