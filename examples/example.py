@@ -5,7 +5,7 @@ import time
 import ipdab
 
 logging.basicConfig(
-    filename="example.log",
+    # filename="example.log",
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
