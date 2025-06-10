@@ -17,6 +17,9 @@ class Debugger:
 
             class CustomTerminalPdb(TerminalPdb):
                 def user_line(inner_self, frame):
+                    """
+                    Called after set_trace()
+                    """
                     logging.debug(
                         f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
                     )
@@ -26,13 +29,26 @@ class Debugger:
                     except Exception as e:
                         logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
+                def postcmd(inner_self, stop, line):
+                    """
+                    Called after each command execution in the terminal debugger.
+                    """
+                    try:
+                        if line.strip() in {"n", "s", "step", "next"}:
+                            parent._on_stop(inner_self.curframe)
+                    except Exception as e:
+                        logging.error(f"[DEBUGGER] Error in postcmd: {e}")
+                    return super().postcmd(stop, line)
+
             self.debugger = CustomTerminalPdb()
         elif backend == "pdb":
-            raise NotImplementedError()
             parent = self
 
             class CustomPdb(pdb.Pdb):
                 def user_line(inner_self, frame):
+                    """
+                    Called after set_trace()
+                    """
                     logging.debug(
                         f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}"
                     )
@@ -41,6 +57,17 @@ class Debugger:
                         super().user_line(frame)
                     except Exception as e:
                         logging.error(f"[DEBUGGER] Error in user_line: {e}")
+
+                def postcmd(inner_self, stop, line):
+                    """
+                    Called after each command execution in the terminal debugger.
+                    """
+                    try:
+                        if line.strip() in {"n", "s", "step", "next"}:
+                            parent._on_stop(inner_self.curframe)
+                    except Exception as e:
+                        logging.error(f"[DEBUGGER] Error in postcmd: {e}")
+                    return super().postcmd(stop, line)
 
             self.debugger = CustomPdb()
         else:
