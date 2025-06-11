@@ -2,6 +2,7 @@ import asyncio
 import logging
 import pdb
 from abc import ABC, abstractmethod
+from bdb import BdbQuit
 
 from IPython.terminal.debugger import TerminalPdb
 
@@ -13,7 +14,7 @@ class CustomDebugger(ABC):
     """
 
     @abstractmethod
-    def __init__(self, parent):
+    def __init__(self, debug_base, parent):
         """
         Initialize the custom debugger with a parent reference.
 
@@ -21,6 +22,7 @@ class CustomDebugger(ABC):
 
         :param parent: Reference to the parent object that will handle callbacks.
         """
+        self._debug_base = debug_base
         self._parent = parent
 
     def user_line(self, frame):
@@ -31,7 +33,7 @@ class CustomDebugger(ABC):
         logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
         try:
             self._parent._on_stop(frame)
-            super().user_line(frame)
+            self._debug_base.user_line(self, frame)
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
@@ -41,7 +43,7 @@ class CustomDebugger(ABC):
                 self._parent._on_stop(self.curframe)
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
-        return super().postcmd(stop, line)
+        return self._debug_base.postcmd(self, stop, line)
 
     def do_quit(self, arg):
         logging.debug("[DEBUGGER] Quit command received")
@@ -49,13 +51,13 @@ class CustomDebugger(ABC):
             self._parent._on_exit()
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in on_exit: {e}")
-        return super().do_quit(arg)
+        return self._debug_base.do_quit(self, arg)
 
     def do_continue(self, arg):
         logging.debug("[DEBUGGER] Continue command received")
         # Run continue, and check if debugger session ended
         try:
-            ret = super().do_continue(arg)
+            ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
             if ret:
                 self._parent._on_exit()
@@ -63,6 +65,14 @@ class CustomDebugger(ABC):
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in do_continue: {e}")
             raise
+
+    def do_EOF(self, arg):
+        logging.debug("[DEBUGGER] EOF received")
+        try:
+            self._parent._on_exit()
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in on_exit (EOF): {e}")
+        return self._debug_base.do_EOF(self, arg)
 
 
 class CustomTerminalPdb(TerminalPdb, CustomDebugger):
@@ -72,7 +82,7 @@ class CustomTerminalPdb(TerminalPdb, CustomDebugger):
     """
 
     def __init__(self, parent, *args, **kwargs):
-        CustomDebugger.__init__(self, parent)
+        CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, **kwargs)
         logging.debug("[DEBUGGER] CustomTerminalPdb initialized")
 
@@ -84,7 +94,7 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
     """
 
     def __init__(self, parent, *args, **kwargs):
-        CustomDebugger.__init__(self, parent)
+        CustomDebugger.__init__(self, pdb.Pdb, parent)
         pdb.Pdb.__init__(self, *args, **kwargs)
         logging.debug("[DEBUGGER] CustomPdb initialized")
 
@@ -140,7 +150,10 @@ class Debugger:
 
     def set_trace(self):
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
-        self.debugger.set_trace()
+        try:
+            self.debugger.set_trace()
+        except (BdbQuit, SystemExit):
+            self._on_exit()
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
