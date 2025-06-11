@@ -291,7 +291,7 @@ if __name__ == "__main__":
     import time
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
