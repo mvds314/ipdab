@@ -1,14 +1,15 @@
 # script_to_debug.py
 import logging
-import time
-
-import ipdab
 
 logging.basicConfig(
     # filename="example.log",
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
+
+import time
+
+import ipdab
 
 print("Starting script...")
 
