@@ -65,7 +65,7 @@ class CustomDebugger(ABC):
             raise
 
 
-class CustomTerminalPdb(CustomDebugger, TerminalPdb):
+class CustomTerminalPdb(TerminalPdb, CustomDebugger):
     """
     Custom TerminalPdb that integrates with the parent Debugger class.
     This class overrides methods to handle stopping and exiting events.
