@@ -30,16 +30,26 @@ class CustomDebugger(ABC):
         Called when the debugger stops at a line of code.
         :param frame: The current stack frame.
         """
-        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
+        logging.debug(
+            f"[DEBUGGER] user_line called, frame {frame.f_code.co_filename}:{frame.f_lineno}"
+        )
         try:
-            self._parent._on_stop(frame)
+            # Call base debugger method first so internal state updates correctly
             self._debug_base.user_line(self, frame)
+            logging.debug(
+                f"[DEBUGGER] Base user_line done, curframe is {getattr(self, 'curframe', None)}"
+            )
+
+            # Then notify parent
+            self._parent._on_stop(frame)
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
     def postcmd(self, stop, line):
         try:
-            if line.strip() in {"n", "s", "step", "next"}:
+            cmd = line.strip().lower()
+            if cmd in {"n", "s", "step", "next"}:
+                logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
                 self._parent._on_stop(self.curframe)
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
@@ -55,7 +65,6 @@ class CustomDebugger(ABC):
 
     def do_continue(self, arg):
         logging.debug("[DEBUGGER] Continue command received")
-        # Run continue, and check if debugger session ended
         try:
             ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
@@ -125,7 +134,9 @@ class Debugger:
 
     def _on_stop(self, frame):
         self.debugger.curframe = frame
-        logging.debug(f"[DEBUGGER] Stopped at: {frame.f_code.co_filename} line {frame.f_lineno}")
+        logging.debug(
+            f"[DEBUGGER] _on_stop called for {frame.f_code.co_filename}:{frame.f_lineno}"
+        )
         if self.stopped_callback:
             loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.stopped_callback):
@@ -134,7 +145,7 @@ class Debugger:
                 self.stopped_callback(reason="breakpoint")
             logging.debug("[DEBUGGER] Stopped callback executed.")
         else:
-            logging.debug("[DEBUGGER] No stopped callback set, continuing without notification.")
+            logging.debug("[DEBUGGER] No stopped callback set.")
 
     def _on_exit(self):
         logging.debug("[DEBUGGER] Debugger is exiting")
@@ -170,3 +181,4 @@ class Debugger:
     @property
     def curframe(self):
         return getattr(self.debugger, "curframe", None)
+
