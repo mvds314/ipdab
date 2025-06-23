@@ -40,11 +40,11 @@ class IPDBAdapterServer:
         event_msg = {"type": "event", "seq": 0, **event_body}
         self.client_writer.write(self.encode_dap_message(event_msg))
         await self.client_writer.drain()
-        logging.debug(f"[DAP] Sent event: {event_msg}")
+        logging.debug(f"[IPDB Server] Sent event: {event_msg}")
 
     async def notify_stopped(self, reason="breakpoint"):
         if self.client_writer:
-            logging.debug(f"[DAP] Notifying stopped: {reason}")
+            logging.debug(f"[IPDB Server] Notifying stopped: {reason}")
             await self.send_event(
                 {
                     "event": "stopped",
@@ -56,22 +56,22 @@ class IPDBAdapterServer:
                 }
             )
         else:
-            logging.debug(f"[DAP] No client connected, cannot notify stopped: {reason}")
+            logging.debug(f"[IPDB Server] No client connected, cannot notify stopped: {reason}")
 
     async def handle_client(self, reader, writer):
-        logging.info("[DAP] New client connection")
+        logging.info("[IPDB Server] New client connection")
         self.client_writer = writer
         self.client_reader = reader
         while True:
             try:
                 msg = await self.read_dap_message(reader)
             except Exception as e:
-                logging.error(f"[DAP] Error reading message: {e}")
+                logging.error(f"[IPDB Server] Error reading message: {e}")
                 break
             if msg is None:
-                logging.info("[DAP] Client disconnected")
+                logging.info("[IPDB Server] Client disconnected")
                 break
-            logging.debug(f"[DAP] Received message: {msg}")
+            logging.debug(f"[IPDB Server] Received message: {msg}")
             response = {
                 "type": "response",
                 "seq": msg.get("seq", 0),
@@ -81,34 +81,34 @@ class IPDBAdapterServer:
             }
             cmd = msg.get("command")
             if cmd == "initialize":
-                logging.info("[DAP] Initialize command received")
+                logging.info("[IPDB Server] Initialize command received")
                 response["body"] = {"supportsConfigurationDoneRequest": True}
             elif cmd == "launch":
-                logging.info("[DAP] Launch command received, initializing debugger")
+                logging.info("[IPDB Server] Launch command received, initializing debugger")
                 response["body"] = {}
                 await self.send_event({"event": "initialized", "body": {}})
             elif cmd == "continue":
-                logging.error("[DAP] Continue commands can only be send through terminal")
+                logging.error("[IPDB Server] Continue commands can only be send through terminal")
                 response["success"] = False
                 response["message"] = "Continue commands can only be sent through terminal"
             elif cmd == "pause":
-                logging.error("[DAP] Pause commands can only be send through terminal")
+                logging.error("[IPDB Server] Pause commands can only be send through terminal")
                 response["success"] = False
                 response["message"] = "Pause commands can only be sent through terminal"
             elif cmd == "stepIn":
-                logging.error("[DAP] StepIn commands can only be send through terminal")
+                logging.error("[IPDB Server] StepIn commands can only be send through terminal")
                 response["success"] = False
                 response["message"] = "StepIn commands can only be sent through terminal"
             elif cmd == "stepOut":
-                logging.error("[DAP] StepOut commands can only be send through terminal")
+                logging.error("[IPDB Server] StepOut commands can only be send through terminal")
                 response["success"] = False
                 response["message"] = "StepOut commands can only be sent through terminal"
             elif cmd == "next":
-                logging.error("[DAP] Next commands can only be send through terminal")
+                logging.error("[IPDB Server] Next commands can only be send through terminal")
                 response["success"] = False
                 response["message"] = "Next commands can only be sent through terminal"
             elif cmd == "configurationDone":
-                logging.info("[DAP] ConfigurationDone command received")
+                logging.info("[IPDB Server] ConfigurationDone command received")
                 response["body"] = {}
                 await self.send_event(
                     {
@@ -117,10 +117,10 @@ class IPDBAdapterServer:
                     }
                 )
             elif cmd == "threads":
-                logging.info("[DAP] Threads command received")
+                logging.info("[IPDB Server] Threads command received")
                 response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
             elif cmd == "stackTrace":
-                logging.info("[DAP] StackTrace command received")
+                logging.info("[IPDB Server] StackTrace command received")
                 frames = []
                 if self.debugger.curframe:
                     f = self.debugger.curframe
@@ -140,7 +140,7 @@ class IPDBAdapterServer:
                         i += 1
                 response["body"] = {"stackFrames": frames, "totalFrames": len(frames)}
             elif cmd == "scopes":
-                logging.info("[DAP] Scopes command received")
+                logging.info("[IPDB Server] Scopes command received")
                 frame_id = msg.get("arguments", {}).get("frameId", 0)
                 response["body"] = {
                     "scopes": [
@@ -157,7 +157,7 @@ class IPDBAdapterServer:
                     ]
                 }
             elif cmd == "variables":
-                logging.info("[DAP] Variables command received")
+                logging.info("[IPDB Server] Variables command received")
                 var_ref = msg.get("arguments", {}).get("variablesReference", 0)
                 frame = self.debugger.curframe
                 variables = []
@@ -169,7 +169,7 @@ class IPDBAdapterServer:
                         variables.append({"name": k, "value": repr(v), "variablesReference": 0})
                 response["body"] = {"variables": variables}
             elif cmd == "evaluate":
-                logging.info("[DAP] Evaluate command received")
+                logging.info("[IPDB Server] Evaluate command received")
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
                     # Evaluate expression in ipdb debugger context
@@ -180,7 +180,7 @@ class IPDBAdapterServer:
                 except Exception as e:
                     response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
             elif cmd == "setBreakpoints":
-                logging.info("[DAP] SetBreakpoints command received")
+                logging.info("[IPDB Server] SetBreakpoints command received")
                 args = msg.get("arguments", {})
                 source = args.get("source", {})
                 path = source.get("path", "")
@@ -197,12 +197,12 @@ class IPDBAdapterServer:
                         actual_bps.append({"verified": True, "line": line})
                 response["body"] = {"breakpoints": actual_bps}
             elif cmd == "setExceptionBreakpoints":
-                logging.info("[DAP] SetExceptionBreakpoints command received")
+                logging.info("[IPDB Server] SetExceptionBreakpoints command received")
                 # You can store exception breakpoints info if needed or just acknowledge
                 response["body"] = {}
                 # For now, just acknowledge success; real implementation would configure exception breakpoints in debugger
             elif cmd == "source":
-                logging.info("[DAP] Source command received")
+                logging.info("[IPDB Server] Source command received")
                 args = msg.get("arguments", {})
                 # For simplicity, handle only file path sources (no binary or compiled sources)
                 if "path" in args.get("source", {}):
@@ -218,28 +218,28 @@ class IPDBAdapterServer:
                     response["success"] = False
                     response["message"] = "Unsupported source reference"
             elif cmd == "disassemble":
-                logging.info("[DAP] Disassemble command received")
+                logging.info("[IPDB Server] Disassemble command received")
                 response["success"] = False
                 response["message"] = "Disassemble not supported in this debugger"
             else:
-                logging.warning(f"[DAP] Unsupported command: {cmd}")
+                logging.warning(f"[IPDB Server] Unsupported command: {cmd}")
                 response["success"] = False
                 response["message"] = f"Unsupported command: {cmd}"
-                logging.warning(f"[DAP] Unsupported command: {cmd}")
+                logging.warning(f"[IPDB Server] Unsupported command: {cmd}")
             writer.write(self.encode_dap_message(response))
             await writer.drain()
-            logging.debug(f"[DAP] Sent response: {response}")
+            logging.debug(f"[IPDB Server] Sent response: {response}")
         writer.close()
         await writer.wait_closed()
 
     async def start_server(self):
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
-        logging.debug(f"[Adapter] DAP server listening on {self.host}:{self.port}")
+        logging.debug(f"[IPDB Server] DAP server listening on {self.host}:{self.port}")
         async with self.server:
             await self.server.serve_forever()
 
     def shutdown(self):
-        logging.info("[Adapter] Shutting down DAP server")
+        logging.info("[IPDB Server] Shutting down DAP server")
         self._shutdown_event.set()
         if self.loop:
             self.loop.call_soon_threadsafe(self.loop.stop)
@@ -251,9 +251,9 @@ class IPDBAdapterServer:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logging.error(f"[Adapter] Event loop exception: {e}")
+            logging.error(f"[IPDB Server] Event loop exception: {e}")
         finally:
-            logging.debug("[Adapter] Event loop stopping")
+            logging.debug("[IPDB Server] Event loop stopping")
             try:
                 self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             finally:
@@ -264,12 +264,12 @@ class IPDBAdapterServer:
 
     def set_trace(self):
         if not self.server:
-            logging.debug("[Adapter] Starting DAP server in a new thread")
+            logging.debug("[IPDB Server] Starting DAP server in a new thread")
             self.start_in_thread()
         else:
-            logging.debug("[Adapter] DAP server already running, setting trace")
+            logging.debug("[IPDB Server] DAP server already running, setting trace")
         # Enter ipdb prompt here
-        self.debugger.set_trace()
+        return self.debugger.set_trace()
 
 
 # Create singleton adapter
@@ -277,8 +277,8 @@ ipdab = IPDBAdapterServer()
 
 
 def set_trace():
-    logging.info("[Adapter] Setting trace in IPDB adapter")
-    ipdab.set_trace()
+    logging.info("[IPDB Server] Setting trace in IPDB adapter")
+    return ipdab.set_trace()
 
 
 if __name__ == "__main__":
