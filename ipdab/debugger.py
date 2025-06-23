@@ -51,6 +51,8 @@ class CustomDebugger(ABC):
             if cmd in {"n", "s", "step", "next"}:
                 logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
                 self._parent._on_stop(self.curframe)
+            else:
+                logging.debug(f"[DEBUGGER] Post command '{cmd}' received; no action taken")
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
         return self._debug_base.postcmd(self, stop, line)
@@ -71,6 +73,10 @@ class CustomDebugger(ABC):
             if ret:
                 self._parent._on_exit()
             return ret
+        except BdbQuit:
+            logging.debug("[DEBUGGER] BdbQuit received, calling _on_exit")
+            self._parent._on_exit()
+            raise
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in do_continue: {e}")
             raise
@@ -84,7 +90,7 @@ class CustomDebugger(ABC):
         return self._debug_base.do_EOF(self, arg)
 
 
-class CustomTerminalPdb(TerminalPdb, CustomDebugger):
+class CustomTerminalPdb(CustomDebugger, TerminalPdb):
     """
     Custom TerminalPdb that integrates with the parent Debugger class.
     This class overrides methods to handle stopping and exiting events.
@@ -162,9 +168,13 @@ class Debugger:
     def set_trace(self):
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
         try:
-            self.debugger.set_trace()
+            return self.debugger.set_trace()
         except (BdbQuit, SystemExit):
+            logging.debug("[DEBUGGER] BdbQuit or SystemExit caught, calling _on_exit")
             self._on_exit()
+        except Exception as e:
+            logging.error(f"[DEBUGGER] Error in set_trace: {e}")
+            raise
 
     def get_all_breaks(self):
         if hasattr(self.debugger, "get_all_breaks"):
@@ -181,4 +191,3 @@ class Debugger:
     @property
     def curframe(self):
         return getattr(self.debugger, "curframe", None)
-
