@@ -92,14 +92,9 @@ class IPDBAdapterServer:
                 response["success"] = False
                 response["message"] = "Continue commands can only be sent through terminal"
             elif cmd == "pause":
-                logging.info("[DAP] Pause command received, pausing debugger")
-                self.debugger.set_trace()
-                await self.send_event(
-                    {
-                        "event": "stopped",
-                        "body": {"reason": "pause", "threadId": 1, "allThreadsStopped": True},
-                    }
-                )
+                logging.error("[DAP] Pause commands can only be send through terminal")
+                response["success"] = False
+                response["message"] = "Pause commands can only be sent through terminal"
             elif cmd == "stepIn":
                 logging.error("[DAP] StepIn commands can only be send through terminal")
                 response["success"] = False
