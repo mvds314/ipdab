@@ -21,3 +21,6 @@ x = 10
 ipdab.set_trace()  # Debugger will stop here
 y = x * 2
 print("Result:", y)
+
+ipdab.set_trace()  # Another breakpoint
+print("Script finished.")
