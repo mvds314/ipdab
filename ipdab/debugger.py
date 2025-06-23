@@ -65,6 +65,8 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in on_exit: {e}")
         return self._debug_base.do_quit(self, arg)
 
+    do_q = do_quit  # Alias for do_quit
+
     def do_continue(self, arg):
         logging.debug("[DEBUGGER] Continue command received")
         try:
