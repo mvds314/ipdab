@@ -269,7 +269,13 @@ class IPDBAdapterServer:
         else:
             logging.debug("[IPDB Server] DAP server already running, setting trace")
         # Enter ipdb prompt here
-        return self.debugger.set_trace()
+        try:
+            return self.debugger.set_trace()
+        except Exception as e:
+            logging.error(
+                f"[IPDB Server] Error of type {e.__class__.__name__} while setting trace: {e}"
+            )
+            raise
 
 
 # Create singleton adapter
