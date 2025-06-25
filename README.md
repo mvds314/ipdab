@@ -30,3 +30,11 @@ ipdab.set_trace()
 
 print("This will be debugged.")
 ```
+
+# TODO
+
+- [ ] Test quit instead of quit
+- [ ] Fix Neovim config keep showing arrow
+- [ ] Fix quit on continue
+- [ ] Exclude ipdab modules from debugger
+- [ ] Double check all the do_bla commands from pdb
