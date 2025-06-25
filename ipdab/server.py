@@ -62,6 +62,10 @@ class IPDBAdapterServer:
             logging.debug(f"[IPDB Server] No client connected, cannot notify stopped: {reason}")
 
     async def notify_exited(self, reason="exited"):
+        """
+        Notify the client that the program has exited.
+        And shutdown the debug adapter server.
+        """
         if self.client_writer:
             logging.debug(f"[IPDB Server] Notifying exited: {reason}")
             await self.send_event(
@@ -75,6 +79,9 @@ class IPDBAdapterServer:
         self.shutdown()
 
     async def notify_terminated(self, reason="terminated"):
+        """
+        Notify the client that the debug adapter server is terminating.
+        """
         if self.client_writer:
             logging.debug("[IPDB Server] Notifying terminated")
             await self.send_event(
@@ -267,6 +274,9 @@ class IPDBAdapterServer:
             await self.server.serve_forever()
 
     def shutdown(self):
+        """
+        Shutdown the DAP server gracefully.
+        """
         logging.info("[IPDB Server] Shutting down DAP server")
         self._shutdown_event.set()
         if self.client_writer and self.loop.is_running():
