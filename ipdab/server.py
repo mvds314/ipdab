@@ -73,6 +73,18 @@ class IPDBAdapterServer:
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify exited: {reason}")
 
+    async def notify_terminated(self, reason="terminated"):
+        if self.client_writer:
+            logging.debug("[IPDB Server] Notifying terminated")
+            await self.send_event(
+                {
+                    "event": "terminated",
+                    "body": {reason: reason},
+                }
+            )
+        else:
+            logging.debug("[IPDB Server] No client connected, cannot notify terminated")
+
     async def handle_client(self, reader, writer):
         logging.info("[IPDB Server] New client connection")
         self.client_writer = writer
@@ -256,8 +268,14 @@ class IPDBAdapterServer:
     def shutdown(self):
         logging.info("[IPDB Server] Shutting down DAP server")
         self._shutdown_event.set()
+        if self.client_writer and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.notify_terminated("shutdown"), self.loop)
+        if self.server:
+            self.server.close()
+            logging.debug("[IPDB Server] Server closed")
         if self.loop:
             self.loop.call_soon_threadsafe(self.loop.stop)
+            logging.debug("[IPDB Server] Event loop stopped")
 
     def _run_loop(self):
         asyncio.set_event_loop(self.loop)
