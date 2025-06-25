@@ -100,8 +100,10 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
     """
 
     def __init__(self, parent, *args, **kwargs):
+        skip = kwargs.pop("skip", [])
+        skip.append("ipdab.*")
         CustomDebugger.__init__(self, TerminalPdb, parent)
-        TerminalPdb.__init__(self, *args, **kwargs)
+        TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
         logging.debug("[DEBUGGER] CustomTerminalPdb initialized")
 
 
@@ -112,8 +114,10 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
     """
 
     def __init__(self, parent, *args, **kwargs):
+        skip = kwargs.pop("skip", [])
+        skip.append("ipdab.*")
         CustomDebugger.__init__(self, pdb.Pdb, parent)
-        pdb.Pdb.__init__(self, *args, **kwargs)
+        pdb.Pdb.__init__(self, *args, skip=skip, **kwargs)
         logging.debug("[DEBUGGER] CustomPdb initialized")
 
 
