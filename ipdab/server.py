@@ -72,6 +72,7 @@ class IPDBAdapterServer:
             )
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify exited: {reason}")
+        self.shutdown()
 
     async def notify_terminated(self, reason="terminated"):
         if self.client_writer:
