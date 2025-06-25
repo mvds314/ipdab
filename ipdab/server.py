@@ -14,7 +14,10 @@ class IPDBAdapterServer:
         self.server = None
         self.loop = asyncio.new_event_loop()
         self.debugger = Debugger(
-            backend=debugger, stopped_callback=self.notify_stopped, loop=self.loop
+            backend=debugger,
+            loop=self.loop,
+            stopped_callback=self.notify_stopped,
+            exited_callback=self.notify_exited,
         )
         self.client_writer = None
         self.client_reader = None
@@ -57,6 +60,18 @@ class IPDBAdapterServer:
             )
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify stopped: {reason}")
+
+    async def notify_exited(self, reason="exited"):
+        if self.client_writer:
+            logging.debug(f"[IPDB Server] Notifying exited: {reason}")
+            await self.send_event(
+                {
+                    "event": "exited",
+                    "body": {"reason": reason},
+                }
+            )
+        else:
+            logging.debug(f"[IPDB Server] No client connected, cannot notify exited: {reason}")
 
     async def handle_client(self, reader, writer):
         logging.info("[IPDB Server] New client connection")

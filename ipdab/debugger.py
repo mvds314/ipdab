@@ -66,6 +66,7 @@ class CustomDebugger(ABC):
         return self._debug_base.do_quit(self, arg)
 
     do_q = do_quit  # Alias for do_quit
+    do_exit = do_quit
 
     def do_continue(self, arg):
         logging.debug("[DEBUGGER] Continue command received")
