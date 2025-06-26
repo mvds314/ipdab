@@ -116,10 +116,10 @@ class IPDBAdapterServer:
             }
             cmd = msg.get("command")
             if cmd == "initialize":
-                logging.info("[IPDB Server] Initialize command received")
+                logging.debug("[IPDB Server] Initialize command received")
                 response["body"] = {"supportsConfigurationDoneRequest": True}
             elif cmd == "launch":
-                logging.info("[IPDB Server] Launch command received, initializing debugger")
+                logging.debug("[IPDB Server] Launch command received, initializing debugger")
                 response["body"] = {}
                 await self.send_event({"event": "initialized", "body": {}})
             elif cmd == "continue":
@@ -143,7 +143,7 @@ class IPDBAdapterServer:
                 response["success"] = False
                 response["message"] = "Next commands can only be sent through terminal"
             elif cmd == "configurationDone":
-                logging.info("[IPDB Server] ConfigurationDone command received")
+                logging.debug("[IPDB Server] ConfigurationDone command received")
                 response["body"] = {}
                 await self.send_event(
                     {
@@ -152,10 +152,10 @@ class IPDBAdapterServer:
                     }
                 )
             elif cmd == "threads":
-                logging.info("[IPDB Server] Threads command received")
+                logging.debug("[IPDB Server] Threads command received")
                 response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
             elif cmd == "stackTrace":
-                logging.info("[IPDB Server] StackTrace command received")
+                logging.debug("[IPDB Server] StackTrace command received")
                 frames = []
                 if self.debugger.curframe:
                     f = self.debugger.curframe
@@ -175,7 +175,7 @@ class IPDBAdapterServer:
                         i += 1
                 response["body"] = {"stackFrames": frames, "totalFrames": len(frames)}
             elif cmd == "scopes":
-                logging.info("[IPDB Server] Scopes command received")
+                logging.debug("[IPDB Server] Scopes command received")
                 frame_id = msg.get("arguments", {}).get("frameId", 0)
                 response["body"] = {
                     "scopes": [
@@ -192,7 +192,7 @@ class IPDBAdapterServer:
                     ]
                 }
             elif cmd == "variables":
-                logging.info("[IPDB Server] Variables command received")
+                logging.debug("[IPDB Server] Variables command received")
                 var_ref = msg.get("arguments", {}).get("variablesReference", 0)
                 frame = self.debugger.curframe
                 variables = []
@@ -204,7 +204,7 @@ class IPDBAdapterServer:
                         variables.append({"name": k, "value": repr(v), "variablesReference": 0})
                 response["body"] = {"variables": variables}
             elif cmd == "evaluate":
-                logging.info("[IPDB Server] Evaluate command received")
+                logging.debug("[IPDB Server] Evaluate command received")
                 expr = msg.get("arguments", {}).get("expression", "")
                 try:
                     # Evaluate expression in ipdb debugger context
@@ -215,7 +215,7 @@ class IPDBAdapterServer:
                 except Exception as e:
                     response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
             elif cmd == "setBreakpoints":
-                logging.info("[IPDB Server] SetBreakpoints command received")
+                logging.debug("[IPDB Server] SetBreakpoints command received")
                 args = msg.get("arguments", {})
                 source = args.get("source", {})
                 path = source.get("path", "")
@@ -232,12 +232,12 @@ class IPDBAdapterServer:
                         actual_bps.append({"verified": True, "line": line})
                 response["body"] = {"breakpoints": actual_bps}
             elif cmd == "setExceptionBreakpoints":
-                logging.info("[IPDB Server] SetExceptionBreakpoints command received")
+                logging.debug("[IPDB Server] SetExceptionBreakpoints command received")
                 # You can store exception breakpoints info if needed or just acknowledge
                 response["body"] = {}
                 # For now, just acknowledge success; real implementation would configure exception breakpoints in debugger
             elif cmd == "source":
-                logging.info("[IPDB Server] Source command received")
+                logging.debug("[IPDB Server] Source command received")
                 args = msg.get("arguments", {})
                 # For simplicity, handle only file path sources (no binary or compiled sources)
                 if "path" in args.get("source", {}):
@@ -253,7 +253,7 @@ class IPDBAdapterServer:
                     response["success"] = False
                     response["message"] = "Unsupported source reference"
             elif cmd == "disassemble":
-                logging.info("[IPDB Server] Disassemble command received")
+                logging.debug("[IPDB Server] Disassemble command received")
                 response["success"] = False
                 response["message"] = "Disassemble not supported in this debugger"
             else:
@@ -269,7 +269,7 @@ class IPDBAdapterServer:
 
     async def start_server(self):
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
-        logging.debug(f"[IPDB Server] DAP server listening on {self.host}:{self.port}")
+        logging.info(f"[IPDB Server] DAP server listening on {self.host}:{self.port}")
         async with self.server:
             await self.server.serve_forever()
 
@@ -327,7 +327,7 @@ ipdab = IPDBAdapterServer()
 
 
 def set_trace():
-    logging.info("[IPDB Server] Setting trace in IPDB adapter")
+    logging.debug("[IPDB Server] Setting trace in IPDB adapter")
     return ipdab.set_trace()
 
 
