@@ -71,11 +71,14 @@ class CustomDebugger(ABC):
     do_exit = do_quit
 
     def do_continue(self, arg):
+        """
+        Not sure if we really need this.
+        """
         logging.debug("[DEBUGGER] Continue command received")
         try:
             ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
-            if ret:
+            if getattr(self._debug_base, "quitting", False):
                 self._call_exit_once()
             return ret
         except BdbQuit:
@@ -87,6 +90,9 @@ class CustomDebugger(ABC):
             raise
 
     def do_EOF(self, arg):
+        """
+        Not sure if we really need this.
+        """
         logging.debug("[DEBUGGER] EOF received")
         try:
             self._call_exit_once()
@@ -94,13 +100,28 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in on_exit (EOF): {e}")
         return self._debug_base.do_EOF(self, arg)
 
+    def set_quit(self):
+        """
+        Not sure if we really need this.
+        """
+        # Called by bdb when quitting the debugger (e.g., after continue at end of program)
+        logging.debug("[DEBUGGER] set_quit called, calling _on_exit")
+        self._call_exit_once()
+        return self._debug_base.set_quit(self)
+
     def interaction(self, frame, traceback=None):
+        """
+        Seems to be called when the interaction stops, but the finally part is not working yet.
+        """
         try:
             self._debug_base.interaction(self, frame, traceback)
         finally:
             logging.debug("[DEBUGGER] Interaction finished, checking if running")
             if not getattr(self, "running", True):
                 logging.debug("[DEBUGGER] Not running, calling _on_exit")
+                self._call_exit_once()
+            elif getattr(self._debug_base, "quitting", False):
+                logging.debug("[DEBUGGER] Quitting, calling _on_exit")
                 self._call_exit_once()
             else:
                 logging.debug("[DEBUGGER] Still running, not calling _on_exit")
