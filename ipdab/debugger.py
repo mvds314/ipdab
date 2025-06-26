@@ -26,6 +26,7 @@ class CustomDebugger(ABC):
         """
         self._debug_base = debug_base
         self._parent = parent
+        self._exited = False
 
     def user_line(self, frame):
         """
@@ -41,7 +42,6 @@ class CustomDebugger(ABC):
             logging.debug(
                 f"[DEBUGGER] Base user_line done, curframe is {getattr(self, 'curframe', None)}"
             )
-
             # Then notify parent
             self._parent._on_stop(frame)
         except Exception as e:
@@ -62,7 +62,7 @@ class CustomDebugger(ABC):
     def do_quit(self, arg):
         logging.debug("[DEBUGGER] Quit command received")
         try:
-            self._parent._on_exit()
+            self._call_exit_once()
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in on_exit: {e}")
         return self._debug_base.do_quit(self, arg)
@@ -76,11 +76,11 @@ class CustomDebugger(ABC):
             ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
             if ret:
-                self._parent._on_exit()
+                self._call_exit_once()
             return ret
         except BdbQuit:
             logging.debug("[DEBUGGER] BdbQuit received, calling _on_exit")
-            self._parent._on_exit()
+            self._call_exit_once()
             raise
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in do_continue: {e}")
@@ -89,10 +89,34 @@ class CustomDebugger(ABC):
     def do_EOF(self, arg):
         logging.debug("[DEBUGGER] EOF received")
         try:
-            self._parent._on_exit()
+            self._call_exit_once()
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in on_exit (EOF): {e}")
         return self._debug_base.do_EOF(self, arg)
+
+    def interaction(self, frame, traceback=None):
+        try:
+            self._debug_base.interaction(self, frame, traceback)
+        finally:
+            logging.debug("[DEBUGGER] Interaction finished, checking if running")
+            if not getattr(self, "running", True):
+                logging.debug("[DEBUGGER] Not running, calling _on_exit")
+                self._call_exit_once()
+            else:
+                logging.debug("[DEBUGGER] Still running, not calling _on_exit")
+
+    def _call_exit_once(self):
+        """
+        Called when the debugger is exiting.
+        This method should be overridden by subclasses to handle exit logic.
+        """
+        if self._exited:
+            logging.debug("[DEBUGGER] _exit called, but already exited")
+            return
+        else:
+            logging.debug("[DEBUGGER] _exit called, calling _on_exit")
+            self._parent._on_exit()
+            self._exited = True
 
 
 class CustomTerminalPdb(CustomDebugger, TerminalPdb):
