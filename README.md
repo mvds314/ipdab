@@ -34,7 +34,7 @@ print("This will be debugged.")
 # TODO
 
 - [x] Test `quit` and `exit` instead of `q`
-- [ ] Fix Neovim config keep showing arrow
+- [x] Fix Neovim config keep showing arrow
 - [ ] Fix quit on continue
-- [ ] Exclude ipdab modules from debugger
+- [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
