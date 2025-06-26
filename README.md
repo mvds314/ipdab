@@ -38,3 +38,7 @@ print("This will be debugged.")
 - [ ] Fix quit on continue
 - [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
+- [ ] Test the setup in ToggleTerm
+- [ ] Add Neovim shortcuts
+- [ ] Create a pypi package
+- [ ] Create a Neovim plugin
