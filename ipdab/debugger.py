@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import pdb
+import pkgutil
+import sysconfig
 from abc import ABC, abstractmethod
 from bdb import BdbQuit
 
@@ -101,14 +103,16 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
 
     def __init__(self, parent, *args, **kwargs):
         skip = kwargs.pop("skip", [])
+        # Add all standard library modules to skip
+        stdlib_path = sysconfig.get_paths()["stdlib"]
+        stdlib_modules = set()
+        for module_info in pkgutil.iter_modules([stdlib_path]):
+            stdlib_modules.add(module_info.name)
+        # Add patterns for all stdlib modules
+        for mod in stdlib_modules:
+            skip.append(mod)
+        # Additional modules to skip
         skip.append("ipdab.*")
-        skip.append("bdb")
-        skip.append("pdb")
-        skip.append("contextlib")
-        skip.append("runpy")
-        skip.append("importlib")
-        skip.append("threading")
-        skip.append("thread")
         skip.append("IPython.terminal.debugger")
         CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
@@ -123,14 +127,16 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
 
     def __init__(self, parent, *args, **kwargs):
         skip = kwargs.pop("skip", [])
+        # Add all standard library modules to skip
+        stdlib_path = sysconfig.get_paths()["stdlib"]
+        stdlib_modules = set()
+        for module_info in pkgutil.iter_modules([stdlib_path]):
+            stdlib_modules.add(module_info.name)
+        # Add patterns for all stdlib modules
+        for mod in stdlib_modules:
+            skip.append(mod)
+        # Additional modules to skip
         skip.append("ipdab.*")
-        skip.append("bdb")
-        skip.append("pdb")
-        skip.append("contextlib")
-        skip.append("runpy")
-        skip.append("threading")
-        skip.append("thread")
-        skip.append("importlib")
         CustomDebugger.__init__(self, pdb.Pdb, parent)
         pdb.Pdb.__init__(self, *args, skip=skip, **kwargs)
         logging.debug("[DEBUGGER] CustomPdb initialized")
