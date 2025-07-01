@@ -139,6 +139,13 @@ class CustomDebugger(ABC):
             self._parent._on_exit()
             self._exited = True
 
+    # TODO: check this one and see if it fixes the continue issue
+    def dispatch_return(self, frame, arg):
+        if frame is self._debug_base.botframe:
+            logging.debug("[DEBUGGER] Dispatching return, calling _on_exit")
+            self.call_on_exit_once()
+        self._debug_base.dispatch_return(self, frame, arg)
+
 
 class CustomTerminalPdb(CustomDebugger, TerminalPdb):
     """
