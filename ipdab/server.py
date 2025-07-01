@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import json
 import logging
 import threading
@@ -22,6 +23,13 @@ class IPDBAdapterServer:
         self.client_writer = None
         self.client_reader = None
         self._shutdown_event = threading.Event()
+
+    def __del__(self):
+        """
+        Ensure the server is properly shutdown when the adapter is deleted.
+        """
+        logging.debug("[IPDB Server] Deleting IPDBAdapterServer instance, shutting down server")
+        self.shutdown()
 
     async def read_dap_message(self, reader):
         header = b""
@@ -330,9 +338,19 @@ class IPDBAdapterServer:
 ipdab = IPDBAdapterServer()
 
 
+def _cleanup():
+    logging.debug("[IPDB Server] Cleaning up IPDB adapter")
+    ipdab.shutdown()
+
+
+atexit.register(_cleanup)
+
+
 def set_trace():
     logging.debug("[IPDB Server] Setting trace in IPDB adapter")
-    return ipdab.set_trace()
+    retval = ipdab.set_trace()
+    logging.debug("[IPDB Server] Trace set, returning from set_trace")
+    return retval
 
 
 if __name__ == "__main__":
