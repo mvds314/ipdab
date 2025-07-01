@@ -35,7 +35,8 @@ print("This will be debugged.")
 
 - [x] Test `quit` and `exit` instead of `q`
 - [x] Fix Neovim config keep showing arrow
-- [ ] Fix quit on continue
+- [x] Fix quit on continue
+- [ ] Fix quit on continue, but script is interactive
 - [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
 - [ ] Test the setup in ToggleTerm
