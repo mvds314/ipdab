@@ -256,6 +256,10 @@ class IPDBAdapterServer:
                 logging.debug("[IPDB Server] Disassemble command received")
                 response["success"] = False
                 response["message"] = "Disassemble not supported in this debugger"
+            elif cmd == "disconnect":
+                logging.info("[IPDB Server] Client disconnected")
+                response["success"] = True
+                response["message"] = "Disconnecting client"
             else:
                 logging.warning(f"[IPDB Server] Unsupported command: {cmd}")
                 response["success"] = False
