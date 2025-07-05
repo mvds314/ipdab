@@ -254,7 +254,7 @@ class Debugger:
             return self.debugger.set_trace()
         except (BdbQuit, SystemExit):
             logging.debug("[DEBUGGER] BdbQuit or SystemExit caught, calling _on_exit")
-            self._on_exit()
+            self.debugger.call_on_exit_once()
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in set_trace: {e}")
             raise
