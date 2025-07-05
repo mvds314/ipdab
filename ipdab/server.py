@@ -295,9 +295,14 @@ class IPDBAdapterServer:
             asyncio.run_coroutine_threadsafe(self.notify_terminated("shutdown"), self.loop)
         if self.server:
             self.server.close()
+            self.server = None
             logging.debug("[IPDB Server] Server closed")
-        if self.loop:
-            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.loop and not self.loop.is_closed():
+            try:
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            finally:
+                self.loop.close()
+                self.loop = None
             logging.debug("[IPDB Server] Event loop stopped")
 
     def _run_loop(self):
@@ -310,10 +315,11 @@ class IPDBAdapterServer:
             logging.error(f"[IPDB Server] Event loop exception: {e}")
         finally:
             logging.debug("[IPDB Server] Event loop stopping")
-            try:
-                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            finally:
-                self.loop.close()
+            if self.loop and not self.loop.is_closed():
+                try:
+                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                finally:
+                    self.loop.close()
 
     def start_in_thread(self):
         threading.Thread(target=self._run_loop, daemon=True).start()
