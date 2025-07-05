@@ -82,6 +82,7 @@ class IPDBAdapterServer:
                     "body": {"reason": reason},
                 }
             )
+            await self.notify_terminated(reason)
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify exited: {reason}")
         self.shutdown()
@@ -299,7 +300,18 @@ class IPDBAdapterServer:
             logging.debug("[IPDB Server] Server closed")
         if self.loop and not self.loop.is_closed():
             try:
-                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                if self.loop.is_running():
+                    fut = asyncio.run_coroutine_threadsafe(
+                        self.loop.shutdown_asyncgens(), self.loop
+                    )
+                    try:
+                        fut.result(timeout=2)
+                    except asyncio.TimeoutError:
+                        logging.warning("[IPDB Server] Shutdown async generators timed out")
+                else:
+                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            except Exception as e:
+                logging.warning(f"[IPDB Server] Exception during shutdown_asyncgens: {e}")
             finally:
                 self.loop.close()
                 self.loop = None
@@ -314,12 +326,8 @@ class IPDBAdapterServer:
         except Exception as e:
             logging.error(f"[IPDB Server] Event loop exception: {e}")
         finally:
-            logging.debug("[IPDB Server] Event loop stopping")
-            if self.loop and not self.loop.is_closed():
-                try:
-                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-                finally:
-                    self.loop.close()
+            logging.debug("[IPDB Server] Event loop stopping, shutting down")
+            self.shutdown()
 
     def start_in_thread(self):
         threading.Thread(target=self._run_loop, daemon=True).start()
