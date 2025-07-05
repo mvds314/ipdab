@@ -78,7 +78,7 @@ class CustomDebugger(ABC):
         try:
             ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
-            if getattr(self._debug_base, "quitting", False):
+            if getattr(self, "quitting", False):
                 logging.debug("[DEBUGGER] Not quitting, calling on exit once, why?")
                 self.call_on_exit_once()
             return ret
@@ -121,7 +121,7 @@ class CustomDebugger(ABC):
             if not getattr(self, "running", True):
                 logging.debug("[DEBUGGER] Not running, calling _on_exit once")
                 self.call_on_exit_once()
-            elif getattr(self._debug_base, "quitting", False):
+            elif getattr(self, "quitting", False):
                 logging.debug("[DEBUGGER] Quitting, calling _on_exit")
                 self.call_on_exit_once()
             else:
