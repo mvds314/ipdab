@@ -167,6 +167,8 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
         # Additional modules to skip
         skip.append("ipdab.*")
         skip.append("IPython.terminal.debugger")
+        skip.append("concurrent.futures.*")
+        skip.append("threading")
         CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
         logging.debug("[DEBUGGER] CustomTerminalPdb initialized")
