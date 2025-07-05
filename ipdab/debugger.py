@@ -60,7 +60,7 @@ class CustomDebugger(ABC):
         return self._debug_base.postcmd(self, stop, line)
 
     def do_quit(self, arg):
-        logging.debug("[DEBUGGER] Quit command received")
+        logging.debug("[DEBUGGER] Quit command received, calling on exit once")
         try:
             self.call_on_exit_once()
         except Exception as e:
@@ -79,6 +79,7 @@ class CustomDebugger(ABC):
             ret = self._debug_base.do_continue(self, arg)
             # If debugger finished (ret True), call _on_exit
             if getattr(self._debug_base, "quitting", False):
+                logging.debug("[DEBUGGER] Not quitting, calling on exit once, why?")
                 self.call_on_exit_once()
             return ret
         except BdbQuit:
@@ -93,7 +94,7 @@ class CustomDebugger(ABC):
         """
         Not sure if we really need this.
         """
-        logging.debug("[DEBUGGER] EOF received")
+        logging.debug("[DEBUGGER] EOF received, calling on exit once")
         try:
             self.call_on_exit_once()
         except Exception as e:
@@ -105,7 +106,7 @@ class CustomDebugger(ABC):
         Not sure if we really need this.
         """
         # Called by bdb when quitting the debugger (e.g., after continue at end of program)
-        logging.debug("[DEBUGGER] set_quit called, calling _on_exit")
+        logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
         self.call_on_exit_once()
         return self._debug_base.set_quit(self)
 
@@ -118,7 +119,7 @@ class CustomDebugger(ABC):
         finally:
             logging.debug("[DEBUGGER] Interaction finished, checking if running")
             if not getattr(self, "running", True):
-                logging.debug("[DEBUGGER] Not running, calling _on_exit")
+                logging.debug("[DEBUGGER] Not running, calling _on_exit once")
                 self.call_on_exit_once()
             elif getattr(self._debug_base, "quitting", False):
                 logging.debug("[DEBUGGER] Quitting, calling _on_exit")
@@ -226,10 +227,11 @@ class Debugger:
         if self.stopped_callback:
             loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.stopped_callback):
+                logging.debug("[DEBUGGER] Stopped callback awaited.")
                 asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="breakpoint"), loop)
             else:
                 self.stopped_callback(reason="breakpoint")
-            logging.debug("[DEBUGGER] Stopped callback executed.")
+                logging.debug("[DEBUGGER] Stopped callback executed.")
         else:
             logging.debug("[DEBUGGER] No stopped callback set.")
 
@@ -238,10 +240,11 @@ class Debugger:
         if self.exited_callback:
             loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.exited_callback):
+                logging.debug("[DEBUGGER] Exited callback awaited.")
                 asyncio.run_coroutine_threadsafe(self.exited_callback(reason="exited"), loop)
             else:
                 self.exited_callback(reason="exited")
-            logging.debug("[DEBUGGER] Exited callback executed.")
+                logging.debug("[DEBUGGER] Exited callback executed.")
         else:
             logging.debug("[DEBUGGER] No exited callback set.")
 
