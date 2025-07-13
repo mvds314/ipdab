@@ -301,6 +301,7 @@ class IPDBAdapterServer:
         if self.loop and not self.loop.is_closed():
             try:
                 if self.loop.is_running():
+                    logging.debug("[IPDB Server] Loop is running, shutting down async generators")
                     fut = asyncio.run_coroutine_threadsafe(
                         self.loop.shutdown_asyncgens(), self.loop
                     )
@@ -308,11 +309,23 @@ class IPDBAdapterServer:
                         fut.result(timeout=2)
                     except asyncio.TimeoutError:
                         logging.warning("[IPDB Server] Shutdown async generators timed out")
+                        # Then just start cancelling all tasks
+                        for task in asyncio.all_tasks(self.loop):
+                            task.cancel()
+                        self.loop.stop()
+                    else:
+                        logging.debug(
+                            "[IPDB Server] Shutting down async generators completed successfully"
+                        )
                 else:
+                    logging.debug(
+                        "[IPDB Server] Loop is not running, shutting down async generators"
+                    )
                     self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             except Exception as e:
                 logging.warning(f"[IPDB Server] Exception during shutdown_asyncgens: {e}")
             finally:
+                logging.warning("[IPDB Server] Trying to close the event loop")
                 self.loop.close()
                 self.loop = None
             logging.debug("[IPDB Server] Event loop stopped")
