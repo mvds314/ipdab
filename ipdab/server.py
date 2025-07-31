@@ -292,43 +292,46 @@ class IPDBAdapterServer:
         """
         logging.info("[IPDB Server] Shutting down DAP server")
         self._shutdown_event.set()
+        if self.loop is None:
+            if self.server is not None:
+                logging.error("[IPDB Server] Event loop is None, cannot shutdown server")
+                raise RuntimeError("Event loop is not running, cannot shutdown server")
+            # We are already shut down
+            return
+        else:
+            if self.server is None:
+                msg = "Running loop without a server, this should not happen"
+                logging.error(f"[IPDB Server] {msg}")
+                raise RuntimeError(msg)
+        # TODO: check if I need the server for this, if so, only send this if the server is running
         if self.client_writer and self.loop.is_running():
+            logging.debug("[IPDB Server] Notifying client of shutdown")
             asyncio.run_coroutine_threadsafe(self.notify_terminated("shutdown"), self.loop)
-        if self.server:
-            self.server.close()
-            self.server = None
-            logging.debug("[IPDB Server] Server closed")
-        if self.loop and not self.loop.is_closed():
-            try:
-                if self.loop.is_running():
-                    logging.debug("[IPDB Server] Loop is running, shutting down async generators")
-                    fut = asyncio.run_coroutine_threadsafe(
-                        self.loop.shutdown_asyncgens(), self.loop
-                    )
-                    try:
-                        fut.result(timeout=2)
-                    except asyncio.TimeoutError:
-                        logging.warning("[IPDB Server] Shutdown async generators timed out")
-                        # Then just start cancelling all tasks
-                        for task in asyncio.all_tasks(self.loop):
-                            task.cancel()
-                        self.loop.stop()
-                    else:
-                        logging.debug(
-                            "[IPDB Server] Shutting down async generators completed successfully"
-                        )
-                else:
-                    logging.debug(
-                        "[IPDB Server] Loop is not running, shutting down async generators"
-                    )
-                    self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            except Exception as e:
-                logging.warning(f"[IPDB Server] Exception during shutdown_asyncgens: {e}")
-            finally:
-                logging.warning("[IPDB Server] Trying to close the event loop")
-                self.loop.close()
-                self.loop = None
-            logging.debug("[IPDB Server] Event loop stopped")
+        # Close the server
+        if self.server is not None:
+            if not self.loop.is_running():
+                raise RuntimeError("Event loop is not running, cannot close server")
+        logging.debug("[IPDB Server] Closing server and waiting for it to close")
+        await asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop)
+        logging.debug("[IPDB Server] Server closed")
+        # Stopping the event loop
+        logging.debug("[IPDB Server] Loop is running, stopping it")
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        logging.debug("[IPDB Server] Event loop stop called")
+        if self.loopt.is_running():
+            logging.error("[IPDB Server] Event loop is still running after stop")
+            raise RuntimeError("Event loop is still running after stop, this should not happen")
+        # Clean up the stopped loop:
+        logging.debug("[IPDB Server] Cancelling all tasks in the event loop")
+        for task in asyncio.all_tasks(self.loop):
+            task.cancel()
+        logging.debug("[IPDB Server] Shutting down async generators")
+        await asyncio.run_coroutine_threadsafe(self.loop.shutdown_asyncgens(), self.loop)
+        logging.debug("[IPDB Server] Async generators shut down")
+        # Shutdown async generators
+        self.loop.close()
+        self.loop = None
+        logging.debug("[IPDB Server] Event loop stopped")
 
     def _run_loop(self):
         asyncio.set_event_loop(self.loop)
