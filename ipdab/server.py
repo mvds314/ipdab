@@ -13,6 +13,7 @@ class IPDBAdapterServer:
         self.host = host
         self.port = port
         self.server = None
+        self.thread = None
         self.loop = asyncio.new_event_loop()
         self.debugger = Debugger(
             backend=debugger,
@@ -312,13 +313,14 @@ class IPDBAdapterServer:
             if not self.loop.is_running():
                 raise RuntimeError("Event loop is not running, cannot close server")
         logging.debug("[IPDB Server] Closing server and waiting for it to close")
-        await asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop)
+        asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop).result()
         logging.debug("[IPDB Server] Server closed")
         # Stopping the event loop
         logging.debug("[IPDB Server] Loop is running, stopping it")
         self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join()  # Waits until the loop has fully stopped
         logging.debug("[IPDB Server] Event loop stop called")
-        if self.loopt.is_running():
+        if self.loop.is_running():
             logging.error("[IPDB Server] Event loop is still running after stop")
             raise RuntimeError("Event loop is still running after stop, this should not happen")
         # Clean up the stopped loop:
@@ -326,11 +328,12 @@ class IPDBAdapterServer:
         for task in asyncio.all_tasks(self.loop):
             task.cancel()
         logging.debug("[IPDB Server] Shutting down async generators")
-        await asyncio.run_coroutine_threadsafe(self.loop.shutdown_asyncgens(), self.loop)
+        asyncio.run_coroutine_threadsafe(self.loop.shutdown_asyncgens(), self.loop).result()
         logging.debug("[IPDB Server] Async generators shut down")
         # Shutdown async generators
         self.loop.close()
         self.loop = None
+        self.thread = None
         logging.debug("[IPDB Server] Event loop stopped")
 
     def _run_loop(self):
@@ -346,7 +349,8 @@ class IPDBAdapterServer:
             self.shutdown()
 
     def start_in_thread(self):
-        threading.Thread(target=self._run_loop, daemon=True).start()
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
 
     def set_trace(self):
         if not self.server:
