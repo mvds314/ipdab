@@ -308,6 +308,7 @@ class IPDBAdapterServer:
         if self.client_writer and self.loop.is_running():
             logging.debug("[IPDB Server] Notifying client of shutdown")
             asyncio.run_coroutine_threadsafe(self.notify_terminated("shutdown"), self.loop)
+            logging.debug("[IPDB Server] Notifying client of shutdown complete")
         # Close the server
         if self.server is not None:
             if not self.loop.is_running():
