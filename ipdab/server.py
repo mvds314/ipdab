@@ -314,6 +314,7 @@ class IPDBAdapterServer:
             if not self.loop.is_running():
                 raise RuntimeError("Event loop is not running, cannot close server")
         logging.debug("[IPDB Server] Closing server and waiting for it to close")
+        self.server.close()
         asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop).result()
         logging.debug("[IPDB Server] Server closed")
         # Stopping the event loop
