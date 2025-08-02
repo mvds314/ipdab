@@ -307,7 +307,7 @@ class IPDBAdapterServer:
                 logging.debug("[IPDB Server] Server is already shut down, nothing to do")
                 return
         # Close the loop if it is not closed
-        if not self.loop.is_closed():
+        if not self.loop.is_closed() and self.loop.is_running():
             logging.debug("[IPDB Server] Event loop is not closed, proceeding to close the loop")
             if self.server is not None:
                 logging.debug("[IPDB Server] Shutting down server in the event loop")
@@ -327,9 +327,6 @@ class IPDBAdapterServer:
         logging.debug("[IPDB Server] Cancelling all tasks in the event loop")
         for task in asyncio.all_tasks(self.loop):
             task.cancel()
-        logging.debug("[IPDB Server] Shutting down async generators")
-        asyncio.run_coroutine_threadsafe(self.loop.shutdown_asyncgens(), self.loop).result()
-        logging.debug("[IPDB Server] Async generators shut down")
         # Shutdown async generators
         self.loop.close()
         self.loop = None
@@ -383,7 +380,8 @@ class IPDBAdapterServer:
             logging.error(f"[IPDB Server] Event loop exception: {e}")
         finally:
             logging.debug("[IPDB Server] Event loop stopping, shutting down")
-            self.shutdown()
+            if not self.loop.is_closed() and self.loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.loop).result()
 
     def start_in_thread(self):
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
