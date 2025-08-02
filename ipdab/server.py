@@ -7,6 +7,8 @@ import time
 
 from .debugger import Debugger
 
+# TODO: shutdown logic has improved, but still needs to be tested
+
 
 class IPDBAdapterServer:
     def __init__(self, host="127.0.0.1", port=9000, debugger="ipdb"):
