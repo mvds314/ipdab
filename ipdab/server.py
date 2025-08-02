@@ -18,8 +18,8 @@ class IPDBAdapterServer:
         self.debugger = Debugger(
             backend=debugger,
             loop=self.loop,
-            stopped_callback=self.notify_stopped,
-            exited_callback=self.notify_exited,
+            stopped_callback=self.stopped_callback,
+            exited_callback=self.exited_callback,
         )
         self.client_writer = None
         self.client_reader = None
@@ -54,7 +54,7 @@ class IPDBAdapterServer:
         await self.client_writer.drain()
         logging.debug(f"[IPDB Server] Sent event: {event_msg}")
 
-    async def notify_stopped(self, reason="breakpoint"):
+    async def stopped_callback(self, reason="breakpoint"):
         if self.client_writer:
             logging.debug(f"[IPDB Server] Notifying stopped: {reason}")
             await self.send_event(
@@ -70,7 +70,7 @@ class IPDBAdapterServer:
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify stopped: {reason}")
 
-    async def notify_exited(self, reason="exited"):
+    async def exited_callback(self, reason="exited"):
         """
         Notify the client that the program has exited.
         And shutdown the debug adapter server.
