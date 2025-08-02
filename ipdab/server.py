@@ -86,6 +86,8 @@ class IPDBAdapterServer:
             await self.notify_terminated(reason)
         else:
             logging.debug(f"[IPDB Server] No client connected, cannot notify exited: {reason}")
+        logging.debug("[IPDB Server] Exiting debug adapter server")
+        # TODO: fix this one, here we are shutting down the server from within the loop
         self.shutdown()
 
     async def notify_terminated(self, reason="terminated"):
@@ -290,7 +292,25 @@ class IPDBAdapterServer:
     def shutdown(self):
         """
         Shutdown the DAP server gracefully.
+
+        Note there is a difference between shutting down the server from within the event loop
+        and shutting it down from outside the event loop. This method is designed to be called
+        from outside the event loop, such as when the script is exiting or when the user
+        explicitly requests a shutdown.
+
+        If you call `shutdown()` from within the event loop, you should **not** use any blocking or thread-related calls (like `run_coroutine_threadsafe` or `thread.join`).
+        Instead, use only non-blocking, event-loop-safe operations.
+
+        **Event loop-safe shutdown steps:**
+        - Call `await self.notify_terminated("shutdown")` if needed
+        - Call `self.server.close()`
+        - `await self.server.wait_closed()`
+        - Cancel tasks: `[task.cancel() for task in asyncio.all_tasks()]`
+        - Optionally, `await self.loop.shutdown_asyncgens()`
+        - Call `self.loop.stop()` (if you want to stop the loop)
         """
+        if threading.current_thread() == self.thread:
+            raise RuntimeError("Cannot shutdown server from the event loop thread")
         logging.info("[IPDB Server] Shutting down DAP server")
         self._shutdown_event.set()
         if self.loop is None:
@@ -310,17 +330,22 @@ class IPDBAdapterServer:
             asyncio.run_coroutine_threadsafe(self.notify_terminated("shutdown"), self.loop)
             logging.debug("[IPDB Server] Notifying client of shutdown complete")
         # Close the server
-        if self.server is not None:
-            if not self.loop.is_running():
-                raise RuntimeError("Event loop is not running, cannot close server")
         logging.debug("[IPDB Server] Closing server and waiting for it to close")
-        self.server.close()
-        asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop).result()
+        if self.server.is_serving():
+            self.server.close()
+            try:
+                asyncio.run_coroutine_threadsafe(self.server.wait_closed(), self.loop).result(
+                    timeout=5
+                )
+            except asyncio.TimeoutError:
+                if self.server.is_serving():
+                    raise
         logging.debug("[IPDB Server] Server closed")
         # Stopping the event loop
         logging.debug("[IPDB Server] Loop is running, stopping it")
         self.loop.call_soon_threadsafe(self.loop.stop)
-        self.thread.join()  # Waits until the loop has fully stopped
+        if self.thread and threading.current_thread() != self.thread:
+            self.thread.join()  # Waits until the loop has fully stopped
         logging.debug("[IPDB Server] Event loop stop called")
         if self.loop.is_running():
             logging.error("[IPDB Server] Event loop is still running after stop")
