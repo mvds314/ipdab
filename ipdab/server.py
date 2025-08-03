@@ -110,10 +110,13 @@ class IPDBAdapterServer:
         logging.info("[IPDB Server] New client connection")
         self.client_writer = writer
         self.client_reader = reader
-        while True:
+        while not self._shutdown_event.is_set():
             try:
                 # TODO: fix this logic, this prevents server close
                 msg = await self.read_dap_message(reader)
+                if self._shutdown_event.is_set():
+                    logging.debug("[IPDB Server] Shutdown event set, closing client connection")
+                    break
             except Exception as e:
                 logging.error(f"[IPDB Server] Error reading message: {e}")
                 break
@@ -305,7 +308,8 @@ class IPDBAdapterServer:
         Shutdown the event loop gracefully.
         This is a coroutine to be run in the event loop thread.
         """
-        tasks = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
+        current_task = asyncio.current_task(loop=self.loop)
+        tasks = [t for t in asyncio.all_tasks(self.loop) if t is not current_task and not t.done()]
         for task in tasks:
             task.cancel()
         if tasks:
@@ -313,6 +317,14 @@ class IPDBAdapterServer:
             await asyncio.gather(*tasks, return_exceptions=True)
         else:
             logging.debug("[IPDB Server] No tasks to cancel in the event loop")
+        tasks = [t for t in asyncio.all_tasks(self.loop) if t is not current_task and not t.done()]
+        if any(tasks):
+            msg = (
+                "[IPDB Server] There are still tasks running in the event loop after cancellation"
+            )
+            logging.error(msg)
+            raise RuntimeError(msg)
+
         if hasattr(self.loop, "shutdown_asyncgens"):
             logging.debug("[IPDB Server] Shutting down async generators in the event loop")
             await self.loop.shutdown_asyncgens()
@@ -394,6 +406,15 @@ class IPDBAdapterServer:
             logging.debug(
                 "[IPDB Server] No client connected or already notified, skipping shutdown notification"
             )
+        # Cancel all tasks in the event loop
+        # tasks = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
+        # for task in tasks:
+        #     task.cancel()
+        # if tasks:
+        #     logging.debug("[IPDB Server] Cancelling all tasks in the event loop")
+        #     await asyncio.gather(*tasks, return_exceptions=True)
+        # else:
+        #     logging.debug("[IPDB Server] No tasks to cancel in the event loop")
         # Close the server
         if self.server.is_serving():
             logging.debug("[IPDB Server] Closing server and waiting for it to close")
