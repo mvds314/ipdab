@@ -409,7 +409,8 @@ class IPDBAdapterServer:
     def _run_loop(self):
         asyncio.set_event_loop(self.loop)
         try:
-            self.loop.run_forever(self.start_server())
+            self.loop.create_task(self.start_server())
+            self.loop.run_forever()
         except Exception as e:
             logging.error(f"[IPDB Server] Event loop exception: {e}")
         finally:
