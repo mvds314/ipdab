@@ -1,5 +1,6 @@
 import asyncio
 import atexit
+import inspect
 import json
 import logging
 import threading
@@ -8,6 +9,8 @@ import time
 from .debugger import Debugger
 
 # TODO: shutdown logic has improved, but still needs to be tested
+
+# TODO: continue here and add the function names to the logging messages
 
 
 class IPDBAdapterServer:
@@ -31,7 +34,9 @@ class IPDBAdapterServer:
         """
         Ensure the server is properly shutdown when the adapter is deleted.
         """
-        logging.debug("[IPDB Server] Deleting IPDBAdapterServer instance, shutting down server")
+        logging.debug(
+            f"[IPDB Server {inspect.currentframe().f_code.co_name}] Deleting IPDBAdapterServer instance, shutting down server"
+        )
         self.shutdown()
 
     async def read_dap_message(self, reader):
