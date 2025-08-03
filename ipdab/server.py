@@ -112,6 +112,7 @@ class IPDBAdapterServer:
         self.client_reader = reader
         while True:
             try:
+                # TODO: fix this logic, this prevents server close
                 msg = await self.read_dap_message(reader)
             except Exception as e:
                 logging.error(f"[IPDB Server] Error reading message: {e}")
