@@ -393,7 +393,6 @@ class IPDBAdapterServer:
             msg = f"[IPDB Server {function_name} {in_thread}] There are still tasks running in the event loop after cancellation"
             logging.error(msg)
             raise RuntimeError(msg)
-
         if hasattr(self.loop, "shutdown_asyncgens"):
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Shutting down async generators in the event loop"
@@ -476,6 +475,8 @@ class IPDBAdapterServer:
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
+        logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
+        self._shutdown_event.set()
         if self.loop is None:
             if self.server is not None:
                 logging.error(
@@ -497,7 +498,6 @@ class IPDBAdapterServer:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown complete"
             )
-            self._shutdown_event.set()
         else:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] No client connected or already notified, skipping shutdown notification"
