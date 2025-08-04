@@ -404,6 +404,9 @@ class IPDBAdapterServer:
             )
         logging.debug(f"[IPDB Server {function_name} {in_thread}] Stopping the event loop")
         self.loop.stop()
+        logging.debug(
+            f"[IPDB Server {function_name} {in_thread}] Finished cleanup of running loop successfully"
+        )
 
     def shutdown(self):
         """
