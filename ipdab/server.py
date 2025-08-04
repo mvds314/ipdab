@@ -538,12 +538,15 @@ class IPDBAdapterServer:
         except Exception as e:
             logging.error(f"[IPDB Server {function_name} {in_thread}] Event loop exception: {e}")
         finally:
-            # TODO check if there are any non cancelled tasks
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Event loop stopping, shutting down"
-            )
             if not self._shutdown_event.is_set():
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Event loop stopping, shutting down"
+                )
                 asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.loop).result()
+            else:
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Event loop stopping, but shutdown event is already set, skipping shutdown"
+                )
 
     def start_in_thread(self):
         function_name = inspect.currentframe().f_code.co_name
