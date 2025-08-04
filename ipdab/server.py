@@ -35,7 +35,7 @@ class IPDBAdapterServer:
         Ensure the server is properly shutdown when the adapter is deleted.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.debug(
             f"[IPDB Server {function_name} {in_thread}]: Deleting IPDBAdapterServer instance, shutting down server"
         )
@@ -58,7 +58,7 @@ class IPDBAdapterServer:
         return f"Content-Length: {len(body)}\r\n\r\n{body}".encode()
 
     async def send_event(self, event_body):
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         function_name = inspect.currentframe().f_code.co_name
         event_msg = {"type": "event", "seq": 0, **event_body}
         self.client_writer.write(self.encode_dap_message(event_msg))
@@ -66,7 +66,7 @@ class IPDBAdapterServer:
         logging.debug(f"[IPDB Server {function_name} {in_thread}] Sent event: {event_msg}")
 
     async def stopped_callback(self, reason="breakpoint"):
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         function_name = inspect.currentframe().f_code.co_name
         if self.client_writer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying stopped: {reason}")
@@ -91,7 +91,7 @@ class IPDBAdapterServer:
         And shutdown the debug adapter server.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.client_writer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying exited: {reason}")
             await self.send_event(
@@ -113,7 +113,7 @@ class IPDBAdapterServer:
         Notify the client that the debug adapter server is terminating.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.client_writer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying terminated")
             await self.send_event(
@@ -129,7 +129,7 @@ class IPDBAdapterServer:
 
     async def handle_client(self, reader, writer):
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.info(f"[IPDB Server {function_name} {in_thread}] New client connection")
         self.client_writer = writer
         self.client_reader = reader
@@ -351,7 +351,7 @@ class IPDBAdapterServer:
 
     async def start_server(self):
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.server is not None:
             msg = f"[IPDB Server {function_name} {in_thread}] Server is already running, cannot start again"
             logging.error(msg)
@@ -374,7 +374,7 @@ class IPDBAdapterServer:
         This is a coroutine to be run in the event loop thread.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         current_task = asyncio.current_task(loop=self.loop)
         tasks = [t for t in asyncio.all_tasks(self.loop) if t is not current_task and not t.done()]
         for task in tasks:
@@ -412,7 +412,7 @@ class IPDBAdapterServer:
         Shutdown the DAP server and the loop gracefully.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if threading.current_thread() == self.thread:
             raise RuntimeError("Cannot shutdown server from within the event loop thread")
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
@@ -474,7 +474,7 @@ class IPDBAdapterServer:
         To notify the client only once, we use a threading event `_shutdown_event`.
         """
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
         if self.loop is None:
             if self.server is not None:
@@ -530,7 +530,7 @@ class IPDBAdapterServer:
 
     def _run_loop(self):
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.create_task(self.start_server())
@@ -547,13 +547,13 @@ class IPDBAdapterServer:
 
     def start_in_thread(self):
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
 
     def set_trace(self):
         function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else " in main thread"
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if not self.server:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Starting DAP server in a new thread"
