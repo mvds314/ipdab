@@ -10,7 +10,7 @@ from .debugger import Debugger
 
 # TODO: shutdown logic has improved, but still needs to be tested
 
-# TODO: continue here and add the function names to the logging messages
+# TODO: improve shutdown logic based on website info
 
 
 class IPDBAdapterServer:
