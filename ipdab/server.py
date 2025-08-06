@@ -507,6 +507,8 @@ class IPDBAdapterServer:
                 logging.error(msg)
                 raise RuntimeError(msg)
             else:
+                # TODO: is this the correct fix?
+                self.server = None
                 logging.info(
                     f"[IPDB Server {function_name} {in_thread}] DAP server stopped, and closed"
                 )
@@ -644,6 +646,7 @@ class IPDBAdapterServer:
         finally:
             msg = "with" if self._shutdown_event.is_set() else "without"
             msg = f"Event loop stopping, {msg} shutdown event set"
+            # TODO: continue here, how can it be that we set runner to None while server is not None yet
             self.runner = None
             logging.debug(f"[IPDB Server {function_name} {in_thread}] {msg}")
 
