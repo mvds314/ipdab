@@ -180,6 +180,10 @@ class IPDBAdapterServer:
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.info(f"[IPDB Server {function_name} {in_thread}] New client connection")
+        if self.client_writer is not None or self.client_reader is not None:
+            msg = f"[IPDB Server {function_name} {in_thread}] Client already connected, cannot handle new client"
+            logging.error(msg)
+            raise RuntimeError(msg)
         self.client_writer = writer
         self.client_reader = reader
         while not self._shutdown_event.is_set():
@@ -395,8 +399,12 @@ class IPDBAdapterServer:
             writer.write(self.encode_dap_message(response))
             await writer.drain()
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Sent response: {response}")
+        logging.debug(f"[IPDB Server {function_name} {in_thread}] Closing client connection")
         writer.close()
         await writer.wait_closed()
+        self.client_writer = None
+        self.client_reader = None
+        logging.debug(f"[IPDB Server {function_name} {in_thread}] Client connection closed")
 
     async def background_server(self):
         """
