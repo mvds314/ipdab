@@ -8,16 +8,16 @@ import time
 
 from .debugger import Debugger
 
-# TODO: document cleanup logic
-# TODO: pass loop to debugger, maybe with a get method?
 # TODO: review the at exit cleanup logic
 # TODO: review the whole logic
 # TODO: test this setup
+# TODO: remove runner from debugger, but put them inside method of the server
 
 
 class IPDBAdapterServer:
     """
     A debug adapter server for ipdb, implementing the Debug Adapter Protocol (DAP).
+    The debug adapter serves as a singleton that can be used to connect to an ipdb prompt.
 
     The idea is to start server in a separate thread, and then use the
     `set_trace` method to enter the ipdb prompt, which will be connected to the
@@ -42,16 +42,21 @@ class IPDBAdapterServer:
     Note that some methods of the class are supposed to run inside the event loop thread,
     while others are supposed to run in the main thread.
 
-    The setup is as follows:
-    First, `server_main` is the main entry point for the event loop. It creates a server task from the
-    `background_server` method. The server will be cleaned up automatically when this task is cancelled.
+    The setup is as follows. First, `server_main` is the main entry point for the event loop.
+    It creates a server task from the `background_server` method.
+    The server will be cleaned up automatically when this task is cancelled.
     This happens in the `shutdown_server` method, which should run inside the event loop thread.
 
-    #TODO: continue here, and determine how to the shutdown sequence should proceed.
-    Second, the `_run_loop` is the entry point to start `server_main` in an event loop.
-    Third, `_run_loop` is called from the `start_in_thread` method, which starts the event loop and its
-    server in a seprate thread.
-    To initialy shutdown
+    Second, the `run_loop` method is the entry point to start `server_main` in an event loop.
+    It creates a runner for a context manager with automatic cleanup.
+    The runner is also used in the debugger to schedule the `stopped_callback` and `exited_callback`.
+
+    Third, `run_loop` is called from the `start_in_thread` method, which starts the event loop and its
+    server in a seprate thread. In turn, the `start_in_thread` method is called from the `set_trace` method.
+
+    The main entry point from debugging is the `set_trace` function in the module.
+    This function uses the `IPDBAdapterServer` instance and calls its `set_trace` to start the server
+    if it is not already running,
     """
 
     def __init__(self, host="127.0.0.1", port=9000, debugger="ipdb"):
