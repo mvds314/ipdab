@@ -132,7 +132,7 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}] Stopped callback called: {reason}"
         )
         if self.server_running:
-            self.runner.run(self.notify_stopped(), reason=reason)
+            self.runner.run(self.notify_stopped(reason=reason))
             logging.debug("[DEBUGGER] Stopped callback awaited.")
         else:
             msg = "[DEBUGGER] No runner available for stopped callback."
@@ -171,7 +171,7 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}] Exited callback called: {reason}"
         )
         if self.server_running:
-            self.runner.run(self.notify_exited, reason=reason)
+            self.runner.run(self.notify_exited(reason=reason))
             logging.debug("[DEBUGGER] Exited callback awaited.")
         else:
             msg = "[DEBUGGER] No runner available for exited callback."
@@ -632,7 +632,6 @@ class IPDBAdapterServer:
         try:
             with asyncio.Runner() as runner:
                 self.runner = runner
-                runner.run(self._store_runner())
                 runner.run(self.server_main())
         except Exception as e:
             logging.error(f"[IPDB Server {function_name} {in_thread}] Event loop exception: {e}")
