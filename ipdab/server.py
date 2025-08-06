@@ -65,9 +65,9 @@ class IPDBAdapterServer:
         self.server = None
         self.server_task = None
         self.thread = None
+        self.runner = None
         self.debugger = Debugger(
             backend=debugger,
-            runner=self.runner,
             stopped_callback=self.stopped_callback,
             exited_callback=self.exited_callback,
         )
@@ -85,9 +85,6 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}]: Deleting IPDBAdapterServer instance, shutting down server"
         )
         self.shutdown()
-
-    def _get_runner(self):
-        return self.runner
 
     async def read_dap_message(self, reader):
         header = b""
