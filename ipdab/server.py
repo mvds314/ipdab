@@ -8,18 +8,59 @@ import time
 
 from .debugger import Debugger
 
-# TODO: shutdown logic has improved, but still needs to be tested
-
-# TODO: improve shutdown logic based on website info
+# TODO: document cleanup logic
+# TODO: pass loop to debugger, maybe with a get method?
+# TODO: review the at exit cleanup logic
+# TODO: review the whole logic
+# TODO: test this setup
 
 
 class IPDBAdapterServer:
+    """
+    A debug adapter server for ipdb, implementing the Debug Adapter Protocol (DAP).
+
+    The idea is to start server in a separate thread, and then use the
+    `set_trace` method to enter the ipdb prompt, which will be connected to the
+    debug adapter server.
+
+    The DAP protocol is only partly implemented, as ipdb blocks the main thread
+    and does not allow for asynchronous operations. So, the server can only send information
+    to the client, but cannot control the debugger itself. Control over the debugger can only
+    be obtained if one controls the terminal where the ipdb prompt is running.
+
+    So, e.g., in Neovim, one can use this debugger in a Neovim terminal, and connect to it via
+    the a debugger that uses the DAP protocol to match the IDE with the ipdb prompt. To control
+    the ipdb prompt in Neovim, one can create mappings to send debug commands to the terminal, e.g., 'c' for continue,
+    'n' for next, 's' for step in, etc.
+
+    The server runs in a separate thread that uses an asyncio event loop to handle incoming DAP messages.
+    The server listens for incoming connections on the specified host and port, and handles DAP messages.
+    Shutdown of the server is handled gracefully. The main entry points for shutdown are the
+    `exited_callback` and the `_cleanup`. The former is called when the debugger exists, the latter is
+    called when the adapter is deleted or the script exits using the `atexit` module.
+
+    Note that some methods of the class are supposed to run inside the event loop thread,
+    while others are supposed to run in the main thread.
+
+    The setup is as follows:
+    First, `server_main` is the main entry point for the event loop. It creates a server task from the
+    `background_server` method. The server will be cleaned up automatically when this task is cancelled.
+    This happens in the `shutdown_server` method, which should run inside the event loop thread.
+
+    #TODO: continue here, and determine how to the shutdown sequence should proceed.
+    Second, the `_run_loop` is the entry point to start `server_main` in an event loop.
+    Third, `_run_loop` is called from the `start_in_thread` method, which starts the event loop and its
+    server in a seprate thread.
+    To initialy shutdown
+    """
+
     def __init__(self, host="127.0.0.1", port=9000, debugger="ipdb"):
         self.host = host
         self.port = port
         self.server = None
+        self.server_task = None
         self.thread = None
-        self.loop = asyncio.new_event_loop()
+        self.loop = None
         self.debugger = Debugger(
             backend=debugger,
             loop=self.loop,
@@ -349,7 +390,12 @@ class IPDBAdapterServer:
         writer.close()
         await writer.wait_closed()
 
-    async def start_server(self):
+    async def background_server(self):
+        """
+        Server logic is implemented as documented here:
+        https://superfastpython.com/asyncio-server-background-task/#Example_of_Closing_Asyncio_Server_Safely_With_Context_Manager
+        Particularly, we follow the example on how to do this with a context manager.
+        """
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.server is not None:
@@ -365,48 +411,32 @@ class IPDBAdapterServer:
         logging.info(
             f"[IPDB Server {function_name} {in_thread}] DAP server listening on {self.host}:{self.port}"
         )
-        async with self.server:
-            await self.server.serve_forever()
+        try:
+            async with self.server:
+                await self.server.serve_forever()
+        finally:
+            if self.server.is_serving():
+                msg = "[IPDB Server {function_name} {in_thread}] DAP server is serving after closing it, cleanup failed"
+                logging.error(msg)
+                raise RuntimeError(msg)
+            else:
+                logging.info(
+                    f"[IPDB Server {function_name} {in_thread}] DAP server stopped, and closed"
+                )
 
-    async def cleanup_running_loop(self):
+    async def server_main(self):
         """
-        Shutdown the event loop gracefully.
-        This is a coroutine to be run in the event loop thread.
+        Main entry point for the server, to be run in the event loop thread.
+
+        We make the server with a task, cancelling the task, will automatically end the loop
         """
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        current_task = asyncio.current_task(loop=self.loop)
-        tasks = [t for t in asyncio.all_tasks(self.loop) if t is not current_task and not t.done()]
-        for task in tasks:
-            task.cancel()
-        if tasks:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Cancelling all tasks in the event loop"
-            )
-            await asyncio.gather(*tasks, return_exceptions=True)
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No tasks to cancel in the event loop"
-            )
-        tasks = [t for t in asyncio.all_tasks(self.loop) if t is not current_task and not t.done()]
-        if any(tasks):
-            msg = f"[IPDB Server {function_name} {in_thread}] There are still tasks running in the event loop after cancellation"
-            logging.error(msg)
-            raise RuntimeError(msg)
-        if hasattr(self.loop, "shutdown_asyncgens"):
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Shutting down async generators in the event loop"
-            )
-            await self.loop.shutdown_asyncgens()
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No async generators to shutdown in the event loop"
-            )
-        logging.debug(f"[IPDB Server {function_name} {in_thread}] Stopping the event loop")
-        self.loop.stop()
-        logging.debug(
-            f"[IPDB Server {function_name} {in_thread}] Finished cleanup of running loop successfully"
-        )
+        # start and run the server as a background task
+        self.server_task = asyncio.create_task(self.background_server())
+        # wait for the server to shutdown
+        try:
+            await self.server_task
+        except asyncio.CancelledError:
+            pass
 
     def shutdown(self):
         """
@@ -419,49 +449,18 @@ class IPDBAdapterServer:
             raise RuntimeError("Cannot shutdown server from within the event loop thread")
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
         # Handle case where there is no loop or loop is already closed
-        if self.loop is None:
-            if self.server is not None:
-                msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
-                logging.error(msg)
-                raise RuntimeError(msg)
-            else:
-                # We are already shut down
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Loop and server are already shut down, nothing to do"
-                )
-                return
-        elif self.loop.is_closed():
+        if self.server_task is None:
             logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Event loop is already closed, nothing to do"
+                f"[IPDB Server {function_name} {in_thread}] No server task to cancel, nothing to do"
             )
-            return
-        # Handle non closed loop and running loop
-        if self.loop.is_running():
-            # Shut down server if it is running
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Event loop is running not closed, proceeding to cleanup tasks"
-            )
-            if self.server is not None:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Shutting down server in the event loop"
-                )
-                asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.loop).result()
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Server shutdown complete"
-                )
-            # This needs to be called on a running loop
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Requesting to clean up running event loop"
-            )
-            asyncio.run_coroutine_threadsafe(self.cleanup_running_loop(), self.loop).result()
         else:
-            if self.server is not None:
-                msg = f"[IPDB Server {function_name} {in_thread}] Event loop is not running, but server is running, cannot shutdown"
-                logging.error(msg)
-                raise RuntimeError(msg)
-        logging.debug(f"[IPDB Server {function_name} {in_thread}] Closing event loop")
-        self.loop.close()
-        self.loop = None
+            asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.loop).result()
+        # TODO: check if event loop is running
+        if self.loop is None and self.server is not None:
+            msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
+            logging.error(msg)
+            raise RuntimeError(msg)
+        self.thread.join()
         if self.thread.is_alive():
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop thread is still alive after closing the loop"
             logging.error(msg)
@@ -475,11 +474,32 @@ class IPDBAdapterServer:
         Shutdown the DAP server gracefully and notify the client if connected.
         To notify the client only once, we use a threading event `_shutdown_event`.
         """
+        # Initialize
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
-        logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
-        self._shutdown_event.set()
+        # Set the shutdown event to prevent multiple shutdown calls
+        if not self._shutdown_event.is_set():
+            logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
+            self._shutdown_event.set()
+            # Only notify the client once, we set the shutdown event afterwards
+            if self.client_writer and self.loop.is_running() and not self._shutdown_event.is_set():
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
+                )
+                await self.notify_terminated("shutdown")
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown complete"
+                )
+            else:
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] No client connected or already notified, skipping shutdown notification"
+                )
+        else:
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Shutdown event already set, skipping shutdown notification"
+            )
+        # Handle some edge cases
         if self.loop is None:
             if self.server is not None:
                 logging.error(
@@ -492,69 +512,52 @@ class IPDBAdapterServer:
                     f"[IPDB Server {function_name} {in_thread}] Server is already shut down, nothing to do"
                 )
                 return
-        # Only notify the client once, we set the shutdown event afterwards
-        if self.client_writer and self.loop.is_running() and not self._shutdown_event.is_set():
+        # Shutdown the server by cancelling the server task if it is not done
+        if self.server_task is not None and not self.server_task.done():
             logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
+                f"[IPDB Server {function_name} {in_thread}] Cancelling server task if it is running"
             )
-            await self.notify_terminated("shutdown")
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown complete"
-            )
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No client connected or already notified, skipping shutdown notification"
-            )
-        # Cancel all tasks in the event loop
-        # tasks = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
-        # for task in tasks:
-        #     task.cancel()
-        # if tasks:
-        #     logging.debug(f"[IPDB Server {function_name} {in_thread}] Cancelling all tasks in the event loop")
-        #     await asyncio.gather(*tasks, return_exceptions=True)
-        # else:
-        #     logging.debug(f"[IPDB Server {function_name} {in_thread}] No tasks to cancel in the event loop")
-        # Close the server
-        if self.server.is_serving():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Closing server and waiting for it to close"
-            )
-            self.server.close()
-            await self.server.wait_closed()
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Server closed")
-            if self.server.is_serving():
-                msg = f"[IPDB Server {function_name} {in_thread}] Server is still serving after close, this should not happen"
-                logging.error(msg)
-                raise RuntimeError(msg)
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Server is not serving, nothing to close"
-            )
+            self.server_task.cancel()
+            try:
+                await self.server_task
+            except asyncio.CancelledError:
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Server task cancelled successfully"
+                )
+            except Exception as e:
+                logging.error(
+                    f"[IPDB Server {function_name} {in_thread}] Error while cancelling server task: {e}"
+                )
+                raise
+            finally:
+                self.server_task = None
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Server shutdown complete"
+                )
 
-    def _run_loop(self):
+    async def _store_loop(self):
+        self.loop = asyncio.get_running_loop()
+
+    def run_loop(self):
+        """
+        Runs the event loop in a context manager
+        """
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        asyncio.set_event_loop(self.loop)
         try:
-            self.loop.create_task(self.start_server())
-            self.loop.run_forever()
+            with asyncio.Runner() as runner:
+                runner.run(self._store_loop())
+                runner.run(self.server_main())
         except Exception as e:
             logging.error(f"[IPDB Server {function_name} {in_thread}] Event loop exception: {e}")
         finally:
-            if not self._shutdown_event.is_set():
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Event loop stopping, shutting down"
-                )
-                asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.loop).result()
-            else:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Event loop stopping, but shutdown event is already set, skipping shutdown"
-                )
+            msg = "with" if self._shutdown_event.is_set() else "without"
+            msg = f"Event loop stopping, {msg} shutdown event set"
+            self.loop = None
+            logging.debug(f"[IPDB Server {function_name} {in_thread}] {msg}")
 
     def start_in_thread(self):
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread = threading.Thread(target=self.run_loop, daemon=True)
         self.thread.start()
 
     def set_trace(self):
