@@ -8,8 +8,6 @@ import time
 
 from .debugger import Debugger
 
-# TODO: review the at exit cleanup logic
-# TODO: review the whole logic
 # TODO: test this setup
 # TODO: remove runner from debugger, but put them inside method of the server
 
@@ -118,6 +116,17 @@ class IPDBAdapterServer:
     @property
     def client_connected(self):
         return self.client_writer is not None and self.client_reader is not None
+
+    @property
+    def server_running(self):
+        if self.server is None and self.server_task is None:
+            return False
+        elif self.server is not None and self.server_task is not None and self.server.is_serving():
+            return self.server.is_serving() and not self.server_task.done()
+        else:
+            msg = "Inconsistent server state: server and server_task mismatch"
+            logging.error(f"[IPDB Server] {msg}")
+            raise RuntimeError(msg)
 
     async def stopped_callback(self, reason="breakpoint"):
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
@@ -472,12 +481,20 @@ class IPDBAdapterServer:
 
         We make the server with a task, cancelling the task, will automatically end the loop
         """
+        function_name = inspect.currentframe().f_code.co_name
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
+        logging.debug(f"[IPDB Server {function_name} {in_thread}] Starting DAP server")
+        if self.server_running:
+            msg = f"[IPDB Server {function_name} {in_thread}] Server is already running, cannot start again"
+            logging.error(msg)
+            raise RuntimeError(msg)
         # start and run the server as a background task
         self.server_task = asyncio.create_task(self.background_server())
         # wait for the server to shutdown
         try:
             await self.server_task
         except asyncio.CancelledError:
+            logging.debug(f"[IPDB Server {function_name} {in_thread}] Server task cancelled")
             pass
 
     def shutdown(self):
@@ -497,8 +514,7 @@ class IPDBAdapterServer:
             )
         else:
             self.runner.run(self.shutdown_server())
-        # TODO: check if event loop is running
-        if self.runner is None and self.server is not None:
+        if self.runner is None and self.server_running:
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
@@ -525,11 +541,7 @@ class IPDBAdapterServer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
             self._shutdown_event.set()
             # Only notify the client once, we set the shutdown event afterwards
-            if (
-                self.client_writer
-                and self.runner._loop.is_running()
-                and not self._shutdown_event.is_set()
-            ):
+            if self.client_connectedand and not self._shutdown_event.is_set():
                 logging.debug(
                     f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
                 )
@@ -547,7 +559,7 @@ class IPDBAdapterServer:
             )
         # Handle some edge cases
         if self.runner is None:
-            if self.server is not None:
+            if self.server_running:
                 logging.error(
                     f"[IPDB Server {function_name} {in_thread}] Event loop is None, cannot shutdown server"
                 )
@@ -561,7 +573,7 @@ class IPDBAdapterServer:
         # Shutdown the server by cancelling the server task if it is not done
         if self.server_task is not None and not self.server_task.done():
             logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Cancelling server task if it is running"
+                f"[IPDB Server {function_name} {in_thread}] Cancelling running server task"
             )
             self.server_task.cancel()
             try:
