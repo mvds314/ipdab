@@ -11,7 +11,6 @@ from .debugger import Debugger
 # TODO: fix q logic
 # TODO: test end with next logic
 # TODO: test step logic
-# TODO: remove runner from debugger, but put them inside method of the server
 
 
 class IPDBAdapterServer:
@@ -66,7 +65,6 @@ class IPDBAdapterServer:
         self.server = None
         self.server_task = None
         self.thread = None
-        self.runner = None
         self.debugger = Debugger(
             backend=debugger,
             runner=self.runner,
@@ -130,7 +128,21 @@ class IPDBAdapterServer:
             logging.error(f"[IPDB Server] {msg}")
             raise RuntimeError(msg)
 
-    async def stopped_callback(self, reason="breakpoint"):
+    def stopped_callback(self, reason="breakpoint"):
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
+        function_name = inspect.currentframe().f_code.co_name
+        logging.debug(
+            f"[IPDB Server {function_name} {in_thread}] Stopped callback called: {reason}"
+        )
+        if self.server_running:
+            self.runner.run(self.notify_stopped(), reason=reason)
+            logging.debug("[DEBUGGER] Stopped callback awaited.")
+        else:
+            msg = "[DEBUGGER] No runner available for stopped callback."
+            logging.error(msg)
+            raise RuntimeError(msg)
+
+    async def notify_stopped(self, reason="breakpoint"):
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         function_name = inspect.currentframe().f_code.co_name
         if self.client_connected:
@@ -150,7 +162,26 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] No client connected, cannot notify stopped: {reason}"
             )
 
-    async def exited_callback(self, reason="exited"):
+    def exited_callback(self, reason="exited"):
+        """
+        Notify the client that the program has exited.
+        And shutdown the debug adapter server.
+        This method is called from the debugger when it exits.
+        """
+        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
+        function_name = inspect.currentframe().f_code.co_name
+        logging.debug(
+            f"[IPDB Server {function_name} {in_thread}] Exited callback called: {reason}"
+        )
+        if self.server_running:
+            self.runner.run(self.notify_exited, reason=reason)
+            logging.debug("[DEBUGGER] Exited callback awaited.")
+        else:
+            msg = "[DEBUGGER] No runner available for exited callback."
+            logging.error(msg)
+            raise RuntimeError(msg)
+
+    async def notify_exited(self, reason="exited"):
         """
         Notify the client that the program has exited.
         And shutdown the debug adapter server.
