@@ -203,14 +203,14 @@ class Debugger:
         *args,
         backend="ipdb",
         stopped_callback=None,
-        loop=None,
+        get_runner=None,
         exited_callback=None,
         **kwargs,
     ):
         backend = backend.lower()
         self.stopped_callback = stopped_callback
         self.exited_callback = exited_callback
-        self.loop = loop
+        self.get_runner = get_runner
 
         if backend == "ipdb":
             self.debugger = CustomTerminalPdb(parent=self)
@@ -227,10 +227,15 @@ class Debugger:
             f"[DEBUGGER] _on_stop called for {frame.f_code.co_filename}:{frame.f_lineno}"
         )
         if self.stopped_callback:
-            loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.stopped_callback):
-                logging.debug("[DEBUGGER] Stopped callback awaited.")
-                asyncio.run_coroutine_threadsafe(self.stopped_callback(reason="breakpoint"), loop)
+                runner = self.get_runner() if self.get_runner else None
+                if not runner:
+                    msg = "[DEBUGGER] No runner available for stopped callback."
+                    logging.error(msg)
+                    raise RuntimeError(msg)
+                else:
+                    runner.run(self.stopped_callback, reason="breakpoint")
+                    logging.debug("[DEBUGGER] Stopped callback awaited.")
             else:
                 self.stopped_callback(reason="breakpoint")
                 logging.debug("[DEBUGGER] Stopped callback executed.")
@@ -240,10 +245,15 @@ class Debugger:
     def _on_exit(self):
         logging.debug("[DEBUGGER] Debugger is exiting")
         if self.exited_callback:
-            loop = self.loop or asyncio.get_event_loop()
             if asyncio.iscoroutinefunction(self.exited_callback):
-                logging.debug("[DEBUGGER] Exited callback awaited.")
-                asyncio.run_coroutine_threadsafe(self.exited_callback(reason="exited"), loop)
+                runner = self.get_runner() if self.get_runner else None
+                if not runner:
+                    msg = "[DEBUGGER] No runner available for exited callback."
+                    logging.error(msg)
+                    raise RuntimeError(msg)
+                else:
+                    runner.run(self.exited_callback, reason="exited")
+                    logging.debug("[DEBUGGER] Exited callback awaited in async context.")
             else:
                 self.exited_callback(reason="exited")
                 logging.debug("[DEBUGGER] Exited callback executed.")
