@@ -116,7 +116,9 @@ class IPDBAdapterServer:
 
     @property
     def server_running(self):
-        if self.server is None and self.server_task is None:
+        if self._shutdown_event.is_set():
+            return False
+        elif self.server is None and self.server_task is None:
             return False
         elif self.server is not None and self.server_task is not None and self.server.is_serving():
             return self.server.is_serving() and not self.server_task.done()
@@ -548,7 +550,7 @@ class IPDBAdapterServer:
             )
         else:
             asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.runner._loop).result()
-        if self.runner is None and self.server_running:
+        if self.runner is None and (self.server is None or self.server_task is None):
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
@@ -593,7 +595,7 @@ class IPDBAdapterServer:
             )
         # Handle some edge cases
         if self.runner is None:
-            if self.server_running:
+            if self.server is None or self.server_task is None:
                 logging.error(
                     f"[IPDB Server {function_name} {in_thread}] Event loop is None, cannot shutdown server"
                 )
