@@ -8,7 +8,9 @@ import time
 
 from .debugger import Debugger
 
-# TODO: test this setup
+# TODO: fix q logic
+# TODO: test end with next logic
+# TODO: test step logic
 # TODO: remove runner from debugger, but put them inside method of the server
 
 
