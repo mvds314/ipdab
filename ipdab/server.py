@@ -575,7 +575,7 @@ class IPDBAdapterServer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
             self._shutdown_event.set()
             # Only notify the client once, we set the shutdown event afterwards
-            if self.client_connectedand and not self._shutdown_event.is_set():
+            if self.client_connected and not self._shutdown_event.is_set():
                 logging.debug(
                     f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
                 )
