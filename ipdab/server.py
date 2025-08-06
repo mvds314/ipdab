@@ -132,7 +132,9 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}] Stopped callback called: {reason}"
         )
         if self.server_running:
-            self.runner.run(self.notify_stopped(reason=reason))
+            asyncio.run_coroutine_threadsafe(
+                self.notify_stopped(reason=reason), self.runner._loop
+            ).result()
             logging.debug("[DEBUGGER] Stopped callback awaited.")
         else:
             msg = "[DEBUGGER] No runner available for stopped callback."
@@ -171,7 +173,9 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}] Exited callback called: {reason}"
         )
         if self.server_running:
-            self.runner.run(self.notify_exited(reason=reason))
+            asyncio.run_coroutine_threadsafe(
+                self.notify_exited(reason=reason), self.runner._loop
+            ).result()
             logging.debug("[DEBUGGER] Exited callback awaited.")
         else:
             msg = "[DEBUGGER] No runner available for exited callback."
@@ -543,7 +547,7 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] No server task to cancel, nothing to do"
             )
         else:
-            self.runner.run(self.shutdown_server())
+            asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.runner._loop).result()
         if self.runner is None and self.server_running:
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
