@@ -133,7 +133,12 @@ class IPDBAdapterServer:
         logging.debug(
             f"[IPDB Server {function_name} {in_thread}] Stopped callback called: {reason}"
         )
-        if self.server_running:
+        if self._shutdown_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Shutdown event set, not notifying stopped"
+            )
+            return
+        elif self.server_running:
             asyncio.run_coroutine_threadsafe(
                 self.notify_stopped(reason=reason), self.runner._loop
             ).result()
@@ -174,7 +179,12 @@ class IPDBAdapterServer:
         logging.debug(
             f"[IPDB Server {function_name} {in_thread}] Exited callback called: {reason}"
         )
-        if self.server_running:
+        if self._shutdown_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Shutdown event set, not notifying exited"
+            )
+            return
+        elif self.server_running:
             asyncio.run_coroutine_threadsafe(
                 self.notify_exited(reason=reason), self.runner._loop
             ).result()
