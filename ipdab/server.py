@@ -7,8 +7,6 @@ import time
 
 from .debugger import Debugger
 
-# TODO: fix `RuntimeError: cannot schedule new futures after shutdown` when exiting ipdb with next (common issue)
-
 
 class IPDBAdapterServer:
     """

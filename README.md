@@ -36,7 +36,7 @@ print("This will be debugged.")
 - [x] Test `quit` and `exit` instead of `q`
 - [x] Fix Neovim config keep showing arrow
 - [x] Fix quit on continue
-- [ ] Fix quit on continue, but script is interactive
+- [x] Fix quit on continue, but script is interactive
 - [ ] Check how ipdab works with module reloads
 - [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
@@ -44,3 +44,4 @@ print("This will be debugged.")
 - [ ] Add Neovim shortcuts
 - [ ] Create a pypi package
 - [ ] Create a Neovim plugin
+- [ ] Fix `RuntimeError: cannot schedule new futures after shutdown` when exiting ipdb with next (common issue)
