@@ -37,6 +37,7 @@ print("This will be debugged.")
 - [x] Fix Neovim config keep showing arrow
 - [x] Fix quit on continue
 - [x] Fix quit on continue, but script is interactive
+- [ ] Test ipdab with Neovim mappings
 - [ ] Check how ipdab works with module reloads
 - [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
