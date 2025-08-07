@@ -1,5 +1,4 @@
 import asyncio
-import atexit
 import inspect
 import json
 import logging
@@ -9,8 +8,8 @@ import time
 from .debugger import Debugger
 
 # TODO: fix q logic
-# TODO: test end with next logic
 # TODO: test step logic
+# TODO: fix `RuntimeError: cannot schedule new futures after shutdown` when exiting ipdb with next (common issue)
 
 
 class IPDBAdapterServer:
@@ -688,15 +687,6 @@ class IPDBAdapterServer:
 
 # Create singleton adapter
 ipdab = IPDBAdapterServer()
-
-
-def _cleanup():
-    function_name = inspect.currentframe().f_code.co_name
-    logging.debug(f"[IPDB Server {function_name}] Cleaning up IPDB adapter")
-    ipdab.shutdown()
-
-
-atexit.register(_cleanup)
 
 
 def set_trace():
