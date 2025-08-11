@@ -654,9 +654,30 @@ class IPDBAdapterServer:
             self.runner = None
             logging.debug(f"[IPDB Server {function_name} {in_thread}] {msg}")
 
-    def start_in_thread(self):
+    def start_in_thread(self, max_wait_time=5):
         self.thread = threading.Thread(target=self.run_loop, daemon=True)
         self.thread.start()
+        t = time.time()
+        dt = min(0.1, max_wait_time / 10)
+        while t < time.time() + max_wait_time:
+            try:
+                server_running = self.server_running
+            except RuntimeError as e:
+                if str(e).startswith("[IPDB Server] Inconsistent server state"):
+                    time.sleep(dt)
+                    continue
+                else:
+                    logging.error(f"[IPDB Server] Error checking server state: {e}")
+                    raise
+            if self.server_running:
+                break
+            else:
+                time.sleep(dt)
+                continue
+        else:
+            raise RuntimeError(
+                f"[IPDB Server] DAP server did not start within {max_wait_time} seconds"
+            )
 
     def set_trace(self):
         function_name = inspect.currentframe().f_code.co_name
