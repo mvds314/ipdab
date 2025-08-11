@@ -1,4 +1,5 @@
 import logging
+import inspect
 import pdb
 import pkgutil
 import sysconfig
@@ -45,6 +46,27 @@ class CustomDebugger(ABC):
             self._parent._on_stop(frame)
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in user_line: {e}")
+
+    def set_trace(self, *args, **kwargs):
+        """
+        Set a trace in the debugger, and notify the parent on stop.
+        """
+        function_name = inspect.currentframe().f_code.co_name
+        logging.debug(f"[DEBUGGER {function_name}] called")
+        try:
+            retval = self._debug_base.set_trace(self, *args, **kwargs)
+            logging.debug(f"[DEBUGGER {function_name}] {function_name} done")
+            # Notify parent that we have stopped
+            if hasattr(self, "curframe"):
+                self._parent._on_stop(self.curframe)
+                logging.debug(
+                    f"[DEBUGGER {function_name}] Parent notified on stop for frame {self.curframe.f_code.co_filename}:{self.curframe.f_lineno}"
+                )
+        except Exception as e:
+            logging.error(f"[DEBUGGER {function_name}] Error: {e}")
+            raise
+        else:
+            return retval
 
     def postcmd(self, stop, line):
         try:
