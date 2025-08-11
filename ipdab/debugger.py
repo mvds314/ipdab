@@ -58,15 +58,13 @@ class CustomDebugger(ABC):
         """
         function_name = inspect.currentframe().f_code.co_name
         logging.debug(f"[DEBUGGER {function_name}] called")
+        curframe = inspect.currentframe()
         try:
             logging.debug(f"[DEBUGGER {function_name}] {function_name} done")
-            if hasattr(self, "curframe") and self.curframe:
-                self._parent._on_stop(self.curframe)
-                logging.debug(
-                    f"[DEBUGGER {function_name}] Parent notified on stop for frame {self.curframe.f_code.co_filename}:{self.curframe.f_lineno}"
-                )
-            else:
-                logging.debug(f"[DEBUGGER {function_name}] No current frame to notify parent")
+            self._parent._on_stop(curframe)
+            logging.debug(
+                f"[DEBUGGER {function_name}] Parent notified on stop for frame {curframe.f_code.co_filename}:{curframe.f_lineno}"
+            )
             retval = self._debug_base.set_trace(self, *args, **kwargs)
         except Exception as e:
             logging.error(f"[DEBUGGER {function_name}] Error: {e}")
