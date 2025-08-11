@@ -139,9 +139,8 @@ class IPDBAdapterServer:
             ).result()
             logging.debug("[DEBUGGER] Stopped callback awaited.")
         else:
-            msg = "[DEBUGGER] No runner available for stopped callback."
-            logging.error(msg)
-            raise RuntimeError(msg)
+            msg = "[DEBUGGER] Server is not running, skipping stopped notification."
+            logging.debug(msg)
 
     async def notify_stopped(self, reason="breakpoint"):
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
