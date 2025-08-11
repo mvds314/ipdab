@@ -50,18 +50,24 @@ class CustomDebugger(ABC):
     def set_trace(self, *args, **kwargs):
         """
         Set a trace in the debugger, and notify the parent on stop.
+
+        The idea is that `set_trace` sets up the debugger.
+        Normally, notification happens in `user_line`, but we also want to notify
+        on consecutive calls to `set_trace`, which would not call `user_line`.
+        On consecutive calls to `set_trace`, `curframe` already set, so notification can happen.
         """
         function_name = inspect.currentframe().f_code.co_name
         logging.debug(f"[DEBUGGER {function_name}] called")
         try:
-            retval = self._debug_base.set_trace(self, *args, **kwargs)
             logging.debug(f"[DEBUGGER {function_name}] {function_name} done")
-            # Notify parent that we have stopped
-            if hasattr(self, "curframe"):
+            if hasattr(self, "curframe") and self.curframe:
                 self._parent._on_stop(self.curframe)
                 logging.debug(
                     f"[DEBUGGER {function_name}] Parent notified on stop for frame {self.curframe.f_code.co_filename}:{self.curframe.f_lineno}"
                 )
+            else:
+                logging.debug(f"[DEBUGGER {function_name}] No current frame to notify parent")
+            retval = self._debug_base.set_trace(self, *args, **kwargs)
         except Exception as e:
             logging.error(f"[DEBUGGER {function_name}] Error: {e}")
             raise
