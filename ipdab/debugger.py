@@ -198,7 +198,7 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
         skip.append("threading")
         CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
-        logging.debug("[DEBUGGER] CustomTerminalPdb initialized")
+        logging.debug("[CustomTerminalPdb] Initialized")
 
 
 class CustomPdb(CustomDebugger, pdb.Pdb):
@@ -221,7 +221,7 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
         skip.append("ipdab.*")
         CustomDebugger.__init__(self, pdb.Pdb, parent)
         pdb.Pdb.__init__(self, *args, skip=skip, **kwargs)
-        logging.debug("[DEBUGGER] CustomPdb initialized")
+        logging.debug("[CustomPdb] Initialized")
 
 
 class Debugger:
