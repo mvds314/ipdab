@@ -38,7 +38,8 @@ print("This will be debugged.")
 - [x] Fix quit on continue
 - [x] Fix quit on continue, but script is interactive
 - [ ] Test ipdab with Neovim mappings
-- [ ] Fix `on_stop` not called with `set_trace` -> test new setup
+- [ ] Fix Neovim config to close debugger on quit and such, config seems broken
+- [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [ ] Check how ipdab works with module reloads
 - [x] Exclude ipdab modules from debugger
 - [ ] Double check all the do_bla commands from pdb
