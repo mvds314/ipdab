@@ -679,7 +679,7 @@ class IPDBAdapterServer:
                 f"[IPDB Server] DAP server did not start within {max_wait_time} seconds"
             )
 
-    def set_trace(self):
+    def set_trace(self, frame=None):
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if not self.server:
@@ -693,7 +693,7 @@ class IPDBAdapterServer:
             )
         # Enter ipdb prompt here
         try:
-            return self.debugger.set_trace()
+            return self.debugger.set_trace(frame=frame)
         except Exception as e:
             logging.error(
                 f"[IPDB Server {function_name} {in_thread}] Error of type {e.__class__.__name__} while setting trace: {e}"
@@ -708,7 +708,8 @@ ipdab = IPDBAdapterServer()
 def set_trace():
     function_name = inspect.currentframe().f_code.co_name
     logging.debug(f"[IPDB Server {function_name}] Setting trace in IPDB adapter")
-    retval = ipdab.set_trace()
+    frame = inspect.currentframe().f_back
+    retval = ipdab.set_trace(frame=frame)
     logging.debug(f"[IPDB Server {function_name}] Trace set, returning from set_trace")
     return retval
 

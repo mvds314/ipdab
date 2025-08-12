@@ -263,10 +263,9 @@ class Debugger:
         else:
             logging.debug("[DEBUGGER] No exited callback set.")
 
-    def set_trace(self):
+    def set_trace(self, frame=None):
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
         try:
-            frame = inspect.currentframe().f_back
             return self.debugger.set_trace(frame=frame)
         except (BdbQuit, SystemExit):
             logging.debug("[DEBUGGER] BdbQuit or SystemExit caught, calling _on_exit")
