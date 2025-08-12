@@ -663,13 +663,13 @@ class IPDBAdapterServer:
             try:
                 server_running = self.server_running
             except RuntimeError as e:
-                if str(e).startswith("[IPDB Server] Inconsistent server state"):
+                if "Inconsistent server state" in str(e):
                     time.sleep(dt)
                     continue
                 else:
                     logging.error(f"[IPDB Server] Error checking server state: {e}")
                     raise
-            if self.server_running:
+            if server_running:
                 break
             else:
                 time.sleep(dt)
