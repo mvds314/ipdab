@@ -56,6 +56,13 @@ class CustomDebugger(ABC):
         on consecutive calls to `set_trace`, which would not call `user_line`.
         On consecutive calls to `set_trace`, `curframe` already set, so notification can happen.
         """
+        if frame is not None:
+            logging.debug(
+                f"[DEBUGGER] set_trace called with frame {frame.f_code.co_filename}:{frame.f_lineno}"
+            )
+            self.curframe = frame
+        elif self.curframe is not None:
+            frame = self.curframe
         function_name = inspect.currentframe().f_code.co_name
         logging.debug(f"[DEBUGGER {function_name}] called")
         try:
