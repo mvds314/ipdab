@@ -47,7 +47,7 @@ class CustomDebugger(ABC):
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in user_line: {e}")
 
-    def set_trace(self, *args, **kwargs):
+    def set_trace(self, *args, frame=None, **kwargs):
         """
         Set a trace in the debugger, and notify the parent on stop.
 
@@ -58,13 +58,13 @@ class CustomDebugger(ABC):
         """
         function_name = inspect.currentframe().f_code.co_name
         logging.debug(f"[DEBUGGER {function_name}] called")
-        curframe = inspect.currentframe()
         try:
+            if frame is not None:
+                self._parent._on_stop(frame)
+                logging.debug(
+                    f"[DEBUGGER {function_name}] Parent notified on stop for frame {frame.f_code.co_filename}:{frame.f_lineno}"
+                )
             logging.debug(f"[DEBUGGER {function_name}] {function_name} done")
-            self._parent._on_stop(curframe)
-            logging.debug(
-                f"[DEBUGGER {function_name}] Parent notified on stop for frame {curframe.f_code.co_filename}:{curframe.f_lineno}"
-            )
             retval = self._debug_base.set_trace(self, *args, **kwargs)
         except Exception as e:
             logging.error(f"[DEBUGGER {function_name}] Error: {e}")
@@ -266,7 +266,8 @@ class Debugger:
     def set_trace(self):
         logging.debug("[DEBUGGER] Trace set, entering debugger.")
         try:
-            return self.debugger.set_trace()
+            frame = inspect.currentframe().f_back
+            return self.debugger.set_trace(frame=frame)
         except (BdbQuit, SystemExit):
             logging.debug("[DEBUGGER] BdbQuit or SystemExit caught, calling _on_exit")
             self.debugger.call_on_exit_once()
