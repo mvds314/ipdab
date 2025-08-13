@@ -3,8 +3,8 @@ import logging
 
 logging.basicConfig(
     # filename="example.log",
-    # level=logging.DEBUG,
-    level=logging.INFO,
+    level=logging.DEBUG,
+    # level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
@@ -21,7 +21,7 @@ print("Starting script...")
 
 time.sleep(1)
 
-ipdab.set_trace()  # or use ipdb.Debugger().set_trace()
+ipdab.set_trace()
 
 x = 10
 ipdab.set_trace()  # Debugger will stop here
