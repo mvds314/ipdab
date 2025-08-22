@@ -37,7 +37,7 @@ print("This will be debugged.")
 
 - [x] Test `quit` and `exit` instead of `q`
 - [x] Fix Neovim config keep showing arrow
-- [x] Fix quit on continue
+- [ ] Fix quit on continue
 - [x] Fix quit on continue, but script is interactive
 - [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [x] Exclude ipdab modules from debugger
