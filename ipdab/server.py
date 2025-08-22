@@ -259,7 +259,6 @@ class IPDBAdapterServer:
                 if msg is None:
                     logging.info(f"[IPDB Server {function_name} {in_thread}] Client disconnected")
                     break
-                logging.debug(f"[IPDB Server {function_name} {in_thread}] Received message: {msg}")
                 response = {
                     "type": "response",
                     "seq": msg.get("seq", 0),
@@ -448,7 +447,9 @@ class IPDBAdapterServer:
                     response["success"] = False
                     response["message"] = "Disassemble not supported in this debugger"
                 elif cmd == "disconnect":
-                    logging.info(f"[IPDB Server {function_name} {in_thread}] Client disconnected")
+                    logging.info(
+                        f"[IPDB Server {function_name} {in_thread}] Disconnect command recived, client disconnected"
+                    )
                     response["success"] = True
                     response["message"] = "Disconnecting client"
                 else:
@@ -462,9 +463,9 @@ class IPDBAdapterServer:
                     )
                 writer.write(self.encode_dap_message(response))
                 await writer.drain()
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
-                )
+                # logging.debug(
+                #     f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
+                # )
         finally:
             await self.disconnect_client()
 
