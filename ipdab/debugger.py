@@ -31,6 +31,9 @@ class CustomDebugger(ABC):
     def user_line(self, frame):
         """
         Called when the debugger stops at a line of code.
+        Main purpose of overloading this method is to notify the parent on stop at
+        a breakpoint.
+
         :param frame: The current stack frame.
         """
         logging.debug(
