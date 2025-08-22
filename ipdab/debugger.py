@@ -80,10 +80,22 @@ class CustomDebugger(ABC):
             return retval
 
     def postcmd(self, stop, line):
+        """
+        Each time a prompt is about to be shown, the `interaction` method
+        sets up `curframe` and then calls `cmdloop` to initialize a command loop.
+        With in the command loop, each time a command is submitted, the following methods
+        are called in order: the hook `precmd` before the execution of the command,
+        the method `onecmd` to execute the command, and the method `postcmd` after the command is executed.
+        """
+        # TODO: why do we notify here, wouldn't it make more sense to overload do_next or do_step?
         try:
             cmd = line.strip().lower()
             if cmd in {"n", "s", "step", "next"}:
                 logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
+                if self.curframe is None:
+                    logging.error(
+                        f"[DEBUGGER] Post command '{cmd}' received while curframe is None"
+                    )
                 self._parent._on_stop(self.curframe)
             else:
                 logging.debug(f"[DEBUGGER] Post command '{cmd}' received; no action taken")
