@@ -28,26 +28,6 @@ class CustomDebugger(ABC):
         self._parent = parent
         self._exited = False
 
-    def user_line(self, frame):
-        """
-        Called when the debugger stops at a line of code.
-        Main purpose of overloading this method is to notify the parent on stop at
-        a breakpoint.
-
-        :param frame: The current stack frame.
-        """
-        logging.debug(
-            f"[DEBUGGER] user_line called, frame {frame.f_code.co_filename}:{frame.f_lineno}"
-        )
-        try:
-            # Call base debugger method first so internal state updates correctly
-            self._debug_base.user_line(self, frame)
-            logging.debug("[DEBUGGER] Base user_line done, notifying parent on stop")
-            # Then notify parent
-            self._parent._on_stop(frame)
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in user_line: {e}")
-
     def preloop(self):
         """
         Whenever the debug stops somewhere, it will open a prompt in the `cmdloop`.
@@ -69,38 +49,6 @@ class CustomDebugger(ABC):
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in preloop: {e}")
         return self._debug_base.preloop(self)
-
-    def set_trace(self, *args, frame=None, **kwargs):
-        """
-        Set a trace in the debugger, and notify the parent on stop.
-
-        The idea is that `set_trace` sets up the debugger.
-        Normally, notification happens in `user_line`, but we also want to notify
-        on consecutive calls to `set_trace`, which would not call `user_line`.
-        On consecutive calls to `set_trace`, `curframe` already set, so notification can happen.
-        """
-        # TODO: continue here
-        # Problem is that `curframe` is not set when `set_trace` is called
-        # The only way do it is to use the precmd hook
-        if frame is not None:
-            logging.debug(
-                f"[DEBUGGER] set_trace called with frame {frame.f_code.co_filename}:{frame.f_lineno}"
-            )
-        function_name = inspect.currentframe().f_code.co_name
-        logging.debug(f"[DEBUGGER {function_name}] called")
-        try:
-            if frame is not None:
-                self._parent._on_stop(frame)
-                logging.debug(
-                    f"[DEBUGGER {function_name}] notifying parent notified on stop for frame {frame.f_code.co_filename}:{frame.f_lineno}"
-                )
-            logging.debug(f"[DEBUGGER {function_name}] {function_name} done")
-            retval = self._debug_base.set_trace(self, *args, frame=frame, **kwargs)
-        except Exception as e:
-            logging.error(f"[DEBUGGER {function_name}] Error: {e}")
-            raise
-        else:
-            return retval
 
     def postcmd(self, stop, line):
         """
