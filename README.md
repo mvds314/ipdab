@@ -41,6 +41,8 @@ print("This will be debugged.")
 - [x] Fix quit on continue, but script is interactive
 - [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [x] Exclude ipdab modules from debugger
+- [ ] Test setup again
+- [ ] Update postcmd logic
 - [ ] Fix Neovim config to close debugger on quit and such, config seems broken
 - [ ] Test ipdab with Neovim mappings
 - [ ] Double check all the do_bla commands from pdb
@@ -52,6 +54,7 @@ print("This will be debugged.")
 - [ ] Check how ipdab works with module reloads
 - [ ] Create a pypi package
 - [ ] Create a Neovim plugin
+- [ ] post mortem support??
 
 # Nice
 
