@@ -136,7 +136,7 @@ class CustomDebugger(ABC):
             if not getattr(self, "running", True):
                 logging.debug("[DEBUGGER] Not running, calling _on_exit once")
                 self.call_on_exit_once()
-            elif getattr(self, "quitting", False):
+            elif getattr(self, "quitting", True):
                 logging.debug("[DEBUGGER] Quitting, calling _on_exit")
                 self.call_on_exit_once()
             else:
