@@ -54,7 +54,11 @@ print("This will be debugged.")
 - [ ] Check how ipdab works with module reloads
 - [ ] Create a pypi package
 - [ ] Create a Neovim plugin
-- [ ] post mortem support??
+- [ ] post mortem support?
+- [ ] Add support for j, as in jump
+- [ ] Add support for r, as in return
+- [ ] Add support for u, as in up
+- [ ] Add support for down as in moving down the stack
 
 # Nice
 
