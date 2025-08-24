@@ -73,73 +73,18 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
         return self._debug_base.postcmd(self, stop, line)
 
-    def do_quit(self, arg):
-        logging.debug("[DEBUGGER] Quit command received, calling on exit once")
-        try:
-            self.call_on_exit_once()
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in on_exit: {e}")
-        return self._debug_base.do_quit(self, arg)
-
-    do_q = do_quit  # Alias for do_quit
-    do_exit = do_quit
-
-    def do_continue(self, arg):
-        """
-        Not sure if we really need this.
-        """
-        logging.debug("[DEBUGGER] Continue command received")
-        try:
-            ret = self._debug_base.do_continue(self, arg)
-            # If debugger finished (ret True), call _on_exit
-            if getattr(self, "quitting", False):
-                logging.debug("[DEBUGGER] Not quitting, calling on exit once, why?")
-                self.call_on_exit_once()
-            return ret
-        except BdbQuit:
-            logging.debug("[DEBUGGER] BdbQuit received, calling _on_exit")
-            self.call_on_exit_once()
-            raise
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in do_continue: {e}")
-            raise
-
-    def do_EOF(self, arg):
-        """
-        Not sure if we really need this.
-        """
-        logging.debug("[DEBUGGER] EOF received, calling on exit once")
-        try:
-            self.call_on_exit_once()
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in on_exit (EOF): {e}")
-        return self._debug_base.do_EOF(self, arg)
-
+    # TODO: this one should be key and sufficient, it's the only way we can quit and raise BdbQuit
     def set_quit(self):
         """
-        Not sure if we really need this.
+        Called when the debugger is quitting, it's the only way a BdbQuit is raised.
+
+        Note that catching BdbQuit is not possible, as we don't not control the main loop.
+        the `set_trace` method merely injects callbacks into the interpreter that cause the
+        debugger to stop at breakpoints and such.
         """
-        # Called by bdb when quitting the debugger (e.g., after continue at end of program)
         logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
         self.call_on_exit_once()
         return self._debug_base.set_quit(self)
-
-    def interaction(self, frame, traceback=None):
-        """
-        Seems to be called when the interaction stops, but the finally part is not working yet.
-        """
-        try:
-            self._debug_base.interaction(self, frame, traceback)
-        finally:
-            logging.debug("[DEBUGGER] Interaction finished, checking if running")
-            if not getattr(self, "running", True):
-                logging.debug("[DEBUGGER] Not running, calling _on_exit once")
-                self.call_on_exit_once()
-            elif getattr(self, "quitting", True):
-                logging.debug("[DEBUGGER] Quitting, calling _on_exit")
-                self.call_on_exit_once()
-            else:
-                logging.debug("[DEBUGGER] Still running, not calling _on_exit")
 
     def call_on_exit_once(self):
         """
@@ -153,13 +98,6 @@ class CustomDebugger(ABC):
             logging.debug("[DEBUGGER] _exit called, calling _on_exit")
             self._parent._on_exit()
             self._exited = True
-
-    # TODO: check this one and see if it fixes the continue issue
-    def dispatch_return(self, frame, arg):
-        if frame is self.botframe:
-            logging.debug("[DEBUGGER] Dispatching return, calling _on_exit")
-            self.call_on_exit_once()
-        self._debug_base.dispatch_return(self, frame, arg)
 
 
 class CustomTerminalPdb(CustomDebugger, TerminalPdb):
