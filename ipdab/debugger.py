@@ -73,7 +73,6 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
         return self._debug_base.postcmd(self, stop, line)
 
-    # TODO: this one should be key and sufficient, it's the only way we can quit and raise BdbQuit
     def set_quit(self):
         """
         Called when the debugger is quitting, it's the only way a BdbQuit is raised.
