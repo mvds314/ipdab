@@ -276,7 +276,11 @@ class IPDBAdapterServer:
                 try:
                     # TODO: fix this logic, this prevents server close
                     msg = await self.read_dap_message(reader)
-                    if self._shutdown_event.is_set():
+                    if (
+                        self._shutdown_event.is_set()
+                        or self._exited_event.is_set()
+                        or self._terminated_event.is_set()
+                    ):
                         logging.debug(
                             f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
                         )
@@ -491,11 +495,29 @@ class IPDBAdapterServer:
                     logging.warning(
                         f"[IPDB Server {function_name} {in_thread}] Unsupported command: {cmd}"
                     )
+                if (
+                    self._shutdown_event.is_set()
+                    or self._exited_event.is_set()
+                    or self._terminated_event.is_set()
+                ):
+                    logging.debug(
+                        f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
+                    )
+                    break
                 writer.write(self.encode_dap_message(response))
                 await writer.drain()
                 # logging.debug(
                 #     f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
                 # )
+                if (
+                    self._shutdown_event.is_set()
+                    or self._exited_event.is_set()
+                    or self._terminated_event.is_set()
+                ):
+                    logging.debug(
+                        f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
+                    )
+                    break
         finally:
             await self.disconnect_client()
 
