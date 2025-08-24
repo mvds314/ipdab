@@ -68,7 +68,10 @@ class IPDBAdapterServer:
         )
         self.client_writer = None
         self.client_reader = None
+        # Prevent call the shutdown function twice
         self._shutdown_event = threading.Event()
+        self._exited_event = threading.Event()
+        self._terminated_event = threading.Event()
 
     def __del__(self):
         """
@@ -166,7 +169,7 @@ class IPDBAdapterServer:
         """
         Notify the client that the program has exited.
         And shutdown the debug adapter server.
-        This method is called from the debugger when it exits.
+        This method is called from the debugger when it exits, i.e., once we do set_quit.
         """
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         function_name = inspect.currentframe().f_code.co_name
@@ -176,6 +179,11 @@ class IPDBAdapterServer:
         if self._shutdown_event.is_set():
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Shutdown event set, not notifying exited"
+            )
+            return
+        elif self._exited_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Exited event already set, not notifying exited again"
             )
             return
         elif self.server_running:
@@ -195,15 +203,30 @@ class IPDBAdapterServer:
         """
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        if self.client_connected:
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying exited: {reason}")
-            await self.send_event(
-                {
-                    "event": "exited",
-                    "body": {"reason": reason},
-                }
+        if self._exited_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Exited event already set, not notifying exited again"
             )
-            await self.notify_terminated(reason)
+            return
+        else:
+            self._exited_event.set()
+        if self.client_connected:
+            if self._notify_terminated_event.is_set():
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Terminated event already set, not notifying exited again"
+                )
+                return
+            else:
+                logging.debug(
+                    f"[IPDB Server {function_name} {in_thread}] Notifying exited: {reason}"
+                )
+                await self.send_event(
+                    {
+                        "event": "exited",
+                        "body": {"reason": reason},
+                    }
+                )
+                await self.notify_terminated(reason)
         else:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] No client connected, cannot notify exited: {reason}"
@@ -217,6 +240,13 @@ class IPDBAdapterServer:
         """
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
+        if self._terminated_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Terminated event already set, not notifying terminated again"
+            )
+            return
+        else:
+            self._terminated_event.set()
         if self.client_connected:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying terminated")
             await self.send_event(
@@ -499,6 +529,16 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set shutdown event"
             )
             self._shutdown_event.clear()
+        if self._exited_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set exited event"
+            )
+            self._exited_event.clear()
+        if self._terminated_event.is_set():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set terminated event"
+            )
+            self._terminated_event.clear()
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
         logging.info(
             f"[IPDB Server {function_name} {in_thread}] DAP server listening on {self.host}:{self.port}"
