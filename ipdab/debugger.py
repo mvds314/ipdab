@@ -1,5 +1,4 @@
 import logging
-import inspect
 import pdb
 import pkgutil
 import sysconfig
