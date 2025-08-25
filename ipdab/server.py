@@ -211,7 +211,7 @@ class IPDBAdapterServer:
         else:
             self._exited_event.set()
         if self.client_connected:
-            if self._notify_terminated_event.is_set():
+            if self._terminated_event.is_set():
                 logging.debug(
                     f"[IPDB Server {function_name} {in_thread}] Terminated event already set, not notifying exited again"
                 )
