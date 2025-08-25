@@ -83,6 +83,7 @@ class CustomDebugger(ABC):
         """
         logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
         self.call_on_exit_once()
+        logging.debug("[DEBUGGER] Calling _on_exit completed")
         return self._debug_base.set_quit(self)
 
     def call_on_exit_once(self):
