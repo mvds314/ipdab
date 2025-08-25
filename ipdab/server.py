@@ -59,6 +59,7 @@ class IPDBAdapterServer:
         self.port = port
         self.server = None
         self.server_task = None
+        self._read_dap_message_task = None
         self.thread = None
         self.runner = None
         self.debugger = Debugger(
@@ -274,8 +275,10 @@ class IPDBAdapterServer:
             self.client_writer = writer
             while not self._shutdown_event.is_set():
                 try:
-                    # TODO: fix this logic, this prevents server close
-                    msg = await self.read_dap_message(reader)
+                    self._read_dap_message_task = asyncio.create_task(
+                        self.read_dap_message(reader)
+                    )
+                    msg = await self._read_dap_message_task
                     if (
                         self._shutdown_event.is_set()
                         or self._exited_event.is_set()
@@ -285,6 +288,11 @@ class IPDBAdapterServer:
                             f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
                         )
                         break
+                except asyncio.CancelledError:
+                    logging.debug(
+                        f"[IPDB Server {function_name} {in_thread}] Read message cancelled, closing client connection"
+                    )
+                    break
                 except Exception as e:
                     logging.error(
                         f"[IPDB Server {function_name} {in_thread}] Error reading message: {e}"
@@ -680,6 +688,8 @@ class IPDBAdapterServer:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Cancelling running server task"
             )
+            if self._read_dap_message_task is not None and not self._read_dap_message_task.done():
+                self._read_dap_message_task.cancel()
             self.server_task.cancel()
             try:
                 await self.server_task
