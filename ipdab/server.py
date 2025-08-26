@@ -808,7 +808,7 @@ class IPDBAdapterServer:
 ipdab = IPDBAdapterServer()
 
 
-def set_trace(on_continue="exit_without_breakpoint"):
+def set_trace(on_continue="keep_running"):
     """
     Entry point to set trace in the IPDB adapter server.
 
