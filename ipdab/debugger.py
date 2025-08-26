@@ -73,6 +73,38 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
         return self._debug_base.postcmd(self, stop, line)
 
+    def set_continue(self):
+        """
+        Afterwards, stops only at breakpoints, when finished, or on calling
+        `set_trace` which simply reinitializes the debugger from the start.
+
+        If there are no breakpoints, set the system trace function to None.
+
+        The return value of `on_continue_callback` determines what happens to
+        the ipdab server:
+        - "exit_without_breakpoint": Exit the debugger on continue if no further breakpoints are set. Note `set_trace` calls do not count as breakpoints, in such cases the debug server will be reinitialized, and the clients needs to reconnect.
+        - "exit": Exit the debug server even if there are break points set.
+        - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
+        """
+        if self.parent.on_continue_callback is not None:
+            on_continue = self.parent.on_continue_callback()
+            if on_continue == "exit_without_breakpoint":
+                if not self.breaks:
+                    logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
+                    self.call_on_exit_once()
+                    logging.debug("[DEBUGGER] Calling _on_exit completed")
+            elif on_continue == "exit":
+                logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
+                self.call_on_exit_once()
+                logging.debug("[DEBUGGER] Calling _on_exit completed")
+            elif on_continue == "keep_running":
+                # TODO: try to do something here
+                pass
+            else:
+                raise ValueError(f"Invalid on_continue return value: {on_continue}")
+        self._debug_base.set_continue(self)
+        self._set_stopinfo(self.botframe, None, -1)
+
     def set_quit(self):
         """
         Called when the debugger is quitting, it's the only way a BdbQuit is raised.
@@ -156,12 +188,13 @@ class Debugger:
         backend="ipdb",
         stopped_callback=None,
         exited_callback=None,
+        on_continue_callback=None,
         **kwargs,
     ):
         backend = backend.lower()
         self.stopped_callback = stopped_callback
         self.exited_callback = exited_callback
-
+        self.on_continue_callback = on_continue_callback
         if backend == "ipdb":
             self.debugger = CustomTerminalPdb(parent=self)
         elif backend == "pdb":

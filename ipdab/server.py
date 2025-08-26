@@ -53,7 +53,9 @@ class IPDBAdapterServer:
     if it is not already running,
     """
 
-    def __init__(self, host="127.0.0.1", port=9000, debugger="ipdb"):
+    def __init__(
+        self, host="127.0.0.1", port=9000, debugger="ipdb", on_continue="exit_without_breakpoint"
+    ):
         # TODO: refactor to private attributes
         self.host = host
         self.port = port
@@ -62,10 +64,12 @@ class IPDBAdapterServer:
         self._read_dap_message_task = None
         self.thread = None
         self.runner = None
+        self.on_continue = on_continue
         self.debugger = Debugger(
             backend=debugger,
             stopped_callback=self.stopped_callback,
             exited_callback=self.exited_callback,
+            on_continue_callback=lambda: self.on_continue,
         )
         self.client_writer = None
         self.client_reader = None
@@ -84,6 +88,28 @@ class IPDBAdapterServer:
             f"[IPDB Server {function_name} {in_thread}]: Deleting IPDBAdapterServer instance, shutting down server"
         )
         self.shutdown()
+
+    @property
+    def on_continue(self):
+        """
+        on_continue : str (default="exit_without_breakpoint")
+        Behavior when continuing from a breakpoint.
+        Options are:
+        - "exit_without_breakpoint": Exit the debugger on continue if no further breakpoints are set. Note `set_trace` calls do not count as breakpoints, in such cases the debug server will be reinitialized, and the clients needs to reconnect.
+        - "exit": Exit the debug server even if there are break points set.
+        - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
+        """
+        return self._on_continue
+
+    @on_continue.setter
+    def on_continue(self, value):
+        if not isinstance(value, str):
+            raise ValueError("on_continue must be a string")
+        if value not in ("exit_without_breakpoint", "exit", "keep_running"):
+            raise ValueError(
+                "on_continue must be one of 'exit_without_breakpoint', 'exit', or 'keep_running'"
+            )
+        self._on_continue = value
 
     async def read_dap_message(self, reader):
         header = b""
@@ -752,7 +778,7 @@ class IPDBAdapterServer:
                 f"[IPDB Server] DAP server did not start within {max_wait_time} seconds"
             )
 
-    def set_trace(self, frame=None):
+    def set_trace(self, frame=None, on_continue="exit_without_breakpoint"):
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if not self.server:
@@ -778,11 +804,31 @@ class IPDBAdapterServer:
 ipdab = IPDBAdapterServer()
 
 
-def set_trace():
+def set_trace(on_continue="exit_without_breakpoint"):
+    """
+    Entry point to set trace in the IPDB adapter server.
+
+    Note that the `pdb` debugger exits and removes its injected
+    tracing mechanism from the interpreter if you choose continue
+    and there are not further breakpoints defined.
+    After this, the debugger can still re-enter if you call
+    `set_trace` again. The on_continue parameter controls
+    what happens with the `ipdab` debug server when you continue
+    from a breakpoint.
+
+    Parameters
+    ----------
+    on_continue : str (default="exit_without_breakpoint")
+        Behavior when continuing from a breakpoint.
+        Options are:
+        - "exit_without_breakpoint": Exit the debugger on continue if no further breakpoints are set. Note `set_trace` calls do not count as breakpoints, in such cases the debug server will be reinitialized, and the clients needs to reconnect.
+        - "exit": Exit the debug server even if there are break points set.
+        - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
+    """
     function_name = inspect.currentframe().f_code.co_name
     logging.debug(f"[IPDB Server {function_name}] Setting trace in IPDB adapter")
     frame = inspect.currentframe().f_back
-    retval = ipdab.set_trace(frame=frame)
+    retval = ipdab.set_trace(frame=frame, on_continue=on_continue)
     logging.debug(f"[IPDB Server {function_name}] Trace set, returning from set_trace")
     return retval
 
