@@ -86,7 +86,7 @@ class CustomDebugger(ABC):
         - "exit": Exit the debug server even if there are break points set.
         - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
         """
-        if self.parent.on_continue_callback is not None:
+        if self._parent.on_continue_callback is not None:
             on_continue = self.parent.on_continue_callback()
             if on_continue == "exit_without_breakpoint":
                 if not self.breaks:
