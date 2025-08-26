@@ -131,6 +131,27 @@ class CustomDebugger(ABC):
             self._parent._on_exit()
             self._exited = True
 
+    # These methods are called by the base debugger to handle events.
+    # They function as callbacks inserted into the interpreter.
+    # def dispatch_return(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_return called at frame {frame}")
+    #     if frame is self.botframe:
+    #         logging.debug("[DEBUGGER] dispatch_return at botframe, calling _on_exit once")
+    #         self.call_on_exit_once()
+    #     self._debug_base.dispatch_return(self, frame, arg)
+
+    # def dispatch_exception(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_exception called at frame {frame} with arg {arg}")
+    #     self._debug_base.dispatch_exception(self, frame, arg)
+    #
+    # def dispatch_line(self, frame):
+    #     logging.debug(f"[DEBUGGER] dispatch_line called at frame {frame}")
+    #     self._debug_base.dispatch_line(self, frame)
+    #
+    # def dispatch_call(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_call called at frame {frame} with arg {arg}")
+    #     self._debug_base.dispatch_call(self, frame, arg)
+
 
 class CustomTerminalPdb(CustomDebugger, TerminalPdb):
     """
