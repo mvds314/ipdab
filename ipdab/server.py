@@ -299,6 +299,7 @@ class IPDBAdapterServer:
             logging.info(f"[IPDB Server {function_name} {in_thread}] New client connection")
             self.client_reader = reader
             self.client_writer = writer
+            self.debugger.clear_exited()
             while not self._shutdown_event.is_set():
                 try:
                     self._read_dap_message_task = asyncio.create_task(
@@ -786,6 +787,9 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] Starting DAP server in a new thread"
             )
             self.start_in_thread()
+            self._shutdown_event.clear()
+            self._exited_event.clear()
+            self._terminated_event.clear()
         else:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] DAP server already running, setting trace"
@@ -831,6 +835,9 @@ def set_trace(on_continue="exit_without_breakpoint"):
     retval = ipdab.set_trace(frame=frame, on_continue=on_continue)
     logging.debug(f"[IPDB Server {function_name}] Trace set, returning from set_trace")
     return retval
+
+
+# TODO: use the atexit module to shutdown the daemon thread in which the server runs
 
 
 if __name__ == "__main__":
