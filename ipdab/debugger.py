@@ -225,6 +225,9 @@ class Debugger:
 
         self.backend = backend
 
+    def clear_exited(self):
+        self.debugger._exited = False
+
     def _on_stop(self, frame):
         logging.debug(
             f"[DEBUGGER] _on_stop called for {frame.f_code.co_filename}:{frame.f_lineno}"
