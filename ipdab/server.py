@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import inspect
 import json
 import logging
@@ -839,6 +840,16 @@ def set_trace(on_continue="keep_running"):
 
 # TODO: use the atexit module to shutdown the daemon thread in which the server runs
 
+
+def cleanup():
+    """
+    Cleanup logic, calls the ipdab.shutdown.
+    Because the server runs in a daemon thread, this logical is called once the main thread exits.
+    """
+    ipdab.shutdown()
+
+
+atexit.register(cleanup)
 
 if __name__ == "__main__":
     # Simple example usage:
