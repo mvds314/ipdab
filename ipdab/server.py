@@ -661,7 +661,7 @@ class IPDBAdapterServer:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Server task cancelled and server shutdown complete"
             )
-        if self.runner is None and (self.server is None or self.server_task is None):
+        if self.runner is None and (self.server is not None or self.server_task is not None):
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
