@@ -654,11 +654,24 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] No server task to cancel, nothing to do"
             )
         else:
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Cancelling server task and shutting down server"
+            )
             asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.runner._loop).result()
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Server task cancelled and server shutdown complete"
+            )
         if self.runner is None and (self.server is None or self.server_task is None):
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
+        if self.runner._loop.is_running():
+            logging.debug(
+                f"[IPDB Server {function_name} {in_thread}] Event loop is still running, cannot join thread"
+            )
+        logging.debug(
+            f"[IPDB Server {function_name} {in_thread}] Waiting for event loop thread to finish"
+        )
         self.thread.join()
         if self.thread.is_alive():
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop thread is still alive after closing the loop"
