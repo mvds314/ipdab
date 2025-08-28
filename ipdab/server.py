@@ -659,7 +659,7 @@ class IPDBAdapterServer:
             )
             asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.runner._loop).result()
             logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Server task cancelled and server shutdown complete"
+                f"[IPDB Server {function_name} {in_thread}] Server task cancelled and server shutdown completed"
             )
         if self.runner is None and (self.server is not None or self.server_task is not None):
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
@@ -679,7 +679,7 @@ class IPDBAdapterServer:
             raise RuntimeError(msg)
         else:
             self.thread = None
-        logging.info(f"[IPDB Server {function_name} {in_thread}] DAP server shutdown complete")
+        logging.info(f"[IPDB Server {function_name} {in_thread}] DAP server shutdown completed")
 
     async def shutdown_server(self):
         """
@@ -701,7 +701,7 @@ class IPDBAdapterServer:
                 )
                 await self.notify_terminated("shutdown")
                 logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown complete"
+                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown completed"
                 )
             else:
                 logging.debug(
@@ -746,7 +746,7 @@ class IPDBAdapterServer:
             finally:
                 self.server_task = None
                 logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Server shutdown complete"
+                    f"[IPDB Server {function_name} {in_thread}] Server shutdown completed"
                 )
 
     def run_loop(self):
