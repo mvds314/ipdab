@@ -665,7 +665,7 @@ class IPDBAdapterServer:
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
-        if self.runner._loop.is_running():
+        if self.runner is not None and self.runner._loop.is_running():
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Event loop is still running, cannot join thread"
             )
