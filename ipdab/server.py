@@ -851,10 +851,7 @@ def set_trace(on_continue="keep_running"):
     return retval
 
 
-# TODO: use the atexit module to shutdown the daemon thread in which the server runs
-
-
-def cleanup():
+def _at_exit_cleanup():
     """
     Cleanup logic, calls the ipdab.shutdown.
     Because the server runs in a daemon thread, this logical is called once the main thread exits.
@@ -862,7 +859,7 @@ def cleanup():
     ipdab.shutdown()
 
 
-atexit.register(cleanup)
+atexit.register(_at_exit_cleanup)
 
 if __name__ == "__main__":
     # Simple example usage:
