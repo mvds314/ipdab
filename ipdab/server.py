@@ -796,6 +796,7 @@ class IPDBAdapterServer:
     def set_trace(self, frame=None, on_continue="exit_without_breakpoint"):
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
+        self.on_continue = on_continue
         if not self.server:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Starting DAP server in a new thread"
