@@ -103,7 +103,6 @@ class CustomDebugger(ABC):
             else:
                 raise ValueError(f"Invalid on_continue return value: {on_continue}")
         self._debug_base.set_continue(self)
-        self._set_stopinfo(self.botframe, None, -1)
 
     def set_quit(self):
         """
