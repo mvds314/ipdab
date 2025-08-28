@@ -712,7 +712,7 @@ class IPDBAdapterServer:
                 f"[IPDB Server {function_name} {in_thread}] Shutdown event already set, skipping shutdown notification"
             )
         # Handle some edge cases
-        if self.runner is not None:
+        if self.runner is None:
             if self.server is None or self.server_task is None:
                 logging.error(
                     f"[IPDB Server {function_name} {in_thread}] Event loop is None, cannot shutdown server"
