@@ -43,6 +43,7 @@ print("This will be debugged.")
 - [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [x] Exclude ipdab modules from debugger
 - [ ] Test setup again
+  - [ ] close on continue does not seem to work anymore
   - [ ] dapui does not close when manual breakpoint is set
   - [ ] Test with other toggles of set_trace
   - [ ] Server does not keep running when keep running is set
