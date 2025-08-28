@@ -43,6 +43,10 @@ print("This will be debugged.")
 - [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [x] Exclude ipdab modules from debugger
 - [ ] Test setup again
+  - [ ] dapui does not close when manual breakpoint is set
+  - [ ] Test with other toggles of set_trace
+  - [ ] Server does not keep running when keep running is set
+  - [ ] Test the other two settings
 - [x] Shutdown daemon thread with atexit module
 - [x] Update postcmd logic
 - [x] Fix Neovim config to close debugger on quit and such, config seems broken
