@@ -540,11 +540,14 @@ class IPDBAdapterServer:
                         f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
                     )
                     break
-                writer.write(self.encode_dap_message(response))
-                await writer.drain()
-                # logging.debug(
-                #     f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
-                # )
+                if cmd == "disconnect":
+                    break
+                else:
+                    writer.write(self.encode_dap_message(response))
+                    await writer.drain()
+                    # logging.debug(
+                    #     f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
+                    # )
                 if (
                     self._shutdown_event.is_set()
                     or self._exited_event.is_set()
@@ -695,7 +698,7 @@ class IPDBAdapterServer:
             logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
             self._shutdown_event.set()
             # Only notify the client once, we set the shutdown event afterwards
-            if self.client_connected and not self._shutdown_event.is_set():
+            if self.client_connected:
                 logging.debug(
                     f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
                 )
