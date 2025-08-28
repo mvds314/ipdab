@@ -21,9 +21,9 @@ print("Starting script...")
 
 time.sleep(1)
 
-ipdab.set_trace(on_continue="exit_without_breakpoint")
+ipdab.set_trace(on_continue="keep_running")  # Debugger will stop here
 
 x = 10
-ipdab.set_trace(on_continue="keep_running")  # Debugger will stop here
+ipdab.set_trace(on_continue="exit_without_breakpoint")
 y = 2 * myfun(x)
 print("Result:", y)
