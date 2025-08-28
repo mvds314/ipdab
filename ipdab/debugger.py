@@ -90,16 +90,20 @@ class CustomDebugger(ABC):
             on_continue = self._parent.on_continue_callback()
             if on_continue == "exit_without_breakpoint":
                 if not self.breaks:
-                    logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
+                    logging.debug(
+                        f"[DEBUGGER] set_continue called with `{on_continue}` and no breaks, calling _on_exit once"
+                    )
                     self.call_on_exit_once()
                     logging.debug("[DEBUGGER] Calling _on_exit completed")
             elif on_continue == "exit":
-                logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
+                logging.debug(
+                    f"[DEBUGGER] set_continue called with `{on_continue}`, calling _on_exit once"
+                )
                 self.call_on_exit_once()
                 logging.debug("[DEBUGGER] Calling _on_exit completed")
             elif on_continue == "keep_running":
                 # TODO: try to do something here
-                pass
+                logging.debug("[DEBUGGER] set_continue called with `keep_running`, continuing")
             else:
                 raise ValueError(f"Invalid on_continue return value: {on_continue}")
         self._debug_base.set_continue(self)
