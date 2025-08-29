@@ -61,9 +61,11 @@ class CustomDebugger(ABC):
         try:
             cmd = line.strip().lower()
             if (
-                cmd in {"n", "s", "step", "next"}
+                cmd in {"n", "s", "step", "next", "unt", "until"}
                 or cmd.startswith("j ")
                 or cmd.startswith("jump ")
+                or cmd.startswith("unt ")
+                or cmd.startswith("until ")
             ):
                 logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
                 if self.curframe is None:

@@ -38,8 +38,8 @@ print("This will be debugged.")
 - [ ] Create a pypi package
 - [ ] Create a Neovim plugin
 - [x] Add support for j, as in jump
-- [ ] Test or add support for return
-- [ ] Test or add support for until
+- [x] Test or add support for return
+- [x] Test or add support for until
 - [ ] Add support for down as in moving down the stack
 
 # later
