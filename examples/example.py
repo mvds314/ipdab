@@ -14,6 +14,7 @@ import ipdab
 
 
 def myfun(x):
+    print("In myfun with x =", x)
     return x
 
 
