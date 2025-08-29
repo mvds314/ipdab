@@ -33,14 +33,17 @@ print("This will be debugged.")
 
 # TODO
 
-- [ ] Test on slower hardware
 - [x] Add Neovim shortcuts
-- [ ] Create a pypi package
-- [ ] Create a Neovim plugin
 - [x] Add support for j, as in jump
 - [x] Test or add support for return
 - [x] Test or add support for until
-- [ ] Add support for down as in moving down the stack
+- [ ] Test on slower hardware
+- [ ] Create a pypi package
+  - [ ] Update the documentation
+  - [ ] Cleanup the repo
+  - [ ] Write pipelines for publishing and such
+- [ ] Create a Neovim plugin
+- [ ] Write a blog post about debugging
 
 # later
 
