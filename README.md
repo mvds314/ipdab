@@ -37,13 +37,20 @@ print("This will be debugged.")
 
 - [x] Test `quit` and `exit` instead of `q`
 - [x] Fix Neovim config keep showing arrow
-- [ ] Fix quit on continue
+- [x] Fix and test the current setup with the on continue and atexit logic.
+- [x] Fix quit on continue
 - [x] Fix quit on continue, but script is interactive
 - [x] Fix `on_stop` not called with `set_trace` -> test new setup
 - [x] Exclude ipdab modules from debugger
 - [ ] Test setup again
-- [ ] Update postcmd logic
-- [ ] Fix Neovim config to close debugger on quit and such, config seems broken
+  - [x] close on continue does not seem to work anymore
+  - [x] dapui does not close when manual breakpoint is set
+  - [x] Test with other toggles of set_trace
+  - [x] Server does not keep running when keep running is set
+  - [x] Test the other two settings
+- [x] Shutdown daemon thread with atexit module
+- [x] Update postcmd logic
+- [x] Fix Neovim config to close debugger on quit and such, config seems broken
 - [ ] Test ipdab with Neovim mappings
 - [ ] Double check all the do_bla commands from pdb
 - [ ] Test the setup in ToggleTerm

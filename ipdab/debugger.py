@@ -73,73 +73,53 @@ class CustomDebugger(ABC):
             logging.error(f"[DEBUGGER] Error in postcmd: {e}")
         return self._debug_base.postcmd(self, stop, line)
 
-    def do_quit(self, arg):
-        logging.debug("[DEBUGGER] Quit command received, calling on exit once")
-        try:
-            self.call_on_exit_once()
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in on_exit: {e}")
-        return self._debug_base.do_quit(self, arg)
-
-    do_q = do_quit  # Alias for do_quit
-    do_exit = do_quit
-
-    def do_continue(self, arg):
+    def set_continue(self):
         """
-        Not sure if we really need this.
+        Afterwards, stops only at breakpoints, when finished, or on calling
+        `set_trace` which simply reinitializes the debugger from the start.
+
+        If there are no breakpoints, set the system trace function to None.
+
+        The return value of `on_continue_callback` determines what happens to
+        the ipdab server:
+        - "exit_without_breakpoint": Exit the debugger on continue if no further breakpoints are set. Note `set_trace` calls do not count as breakpoints, in such cases the debug server will be reinitialized, and the clients needs to reconnect.
+        - "exit": Exit the debug server even if there are break points set.
+        - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
         """
-        logging.debug("[DEBUGGER] Continue command received")
-        try:
-            ret = self._debug_base.do_continue(self, arg)
-            # If debugger finished (ret True), call _on_exit
-            if getattr(self, "quitting", False):
-                logging.debug("[DEBUGGER] Not quitting, calling on exit once, why?")
+        if self._parent.on_continue_callback is not None:
+            on_continue = self._parent.on_continue_callback()
+            if on_continue == "exit_without_breakpoint":
+                if not self.breaks:
+                    logging.debug(
+                        f"[DEBUGGER] set_continue called with `{on_continue}` and no breaks, calling _on_exit once"
+                    )
+                    self.call_on_exit_once()
+                    logging.debug("[DEBUGGER] Calling _on_exit completed")
+            elif on_continue == "exit":
+                logging.debug(
+                    f"[DEBUGGER] set_continue called with `{on_continue}`, calling _on_exit once"
+                )
                 self.call_on_exit_once()
-            return ret
-        except BdbQuit:
-            logging.debug("[DEBUGGER] BdbQuit received, calling _on_exit")
-            self.call_on_exit_once()
-            raise
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in do_continue: {e}")
-            raise
-
-    def do_EOF(self, arg):
-        """
-        Not sure if we really need this.
-        """
-        logging.debug("[DEBUGGER] EOF received, calling on exit once")
-        try:
-            self.call_on_exit_once()
-        except Exception as e:
-            logging.error(f"[DEBUGGER] Error in on_exit (EOF): {e}")
-        return self._debug_base.do_EOF(self, arg)
+                logging.debug("[DEBUGGER] Calling _on_exit completed")
+            elif on_continue == "keep_running":
+                # TODO: try to do something here
+                logging.debug("[DEBUGGER] set_continue called with `keep_running`, continuing")
+            else:
+                raise ValueError(f"Invalid on_continue return value: {on_continue}")
+        self._debug_base.set_continue(self)
 
     def set_quit(self):
         """
-        Not sure if we really need this.
+        Called when the debugger is quitting, it's the only way a BdbQuit is raised.
+
+        Note that catching BdbQuit is not possible, as we don't not control the main loop.
+        the `set_trace` method merely injects callbacks into the interpreter that cause the
+        debugger to stop at breakpoints and such.
         """
-        # Called by bdb when quitting the debugger (e.g., after continue at end of program)
         logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
         self.call_on_exit_once()
+        logging.debug("[DEBUGGER] Calling _on_exit completed")
         return self._debug_base.set_quit(self)
-
-    def interaction(self, frame, traceback=None):
-        """
-        Seems to be called when the interaction stops, but the finally part is not working yet.
-        """
-        try:
-            self._debug_base.interaction(self, frame, traceback)
-        finally:
-            logging.debug("[DEBUGGER] Interaction finished, checking if running")
-            if not getattr(self, "running", True):
-                logging.debug("[DEBUGGER] Not running, calling _on_exit once")
-                self.call_on_exit_once()
-            elif getattr(self, "quitting", True):
-                logging.debug("[DEBUGGER] Quitting, calling _on_exit")
-                self.call_on_exit_once()
-            else:
-                logging.debug("[DEBUGGER] Still running, not calling _on_exit")
 
     def call_on_exit_once(self):
         """
@@ -154,12 +134,26 @@ class CustomDebugger(ABC):
             self._parent._on_exit()
             self._exited = True
 
-    # TODO: check this one and see if it fixes the continue issue
-    def dispatch_return(self, frame, arg):
-        if frame is self.botframe:
-            logging.debug("[DEBUGGER] Dispatching return, calling _on_exit")
-            self.call_on_exit_once()
-        self._debug_base.dispatch_return(self, frame, arg)
+    # These methods are called by the base debugger to handle events.
+    # They function as callbacks inserted into the interpreter.
+    # def dispatch_return(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_return called at frame {frame}")
+    #     if frame is self.botframe:
+    #         logging.debug("[DEBUGGER] dispatch_return at botframe, calling _on_exit once")
+    #         self.call_on_exit_once()
+    #     self._debug_base.dispatch_return(self, frame, arg)
+
+    # def dispatch_exception(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_exception called at frame {frame} with arg {arg}")
+    #     self._debug_base.dispatch_exception(self, frame, arg)
+    #
+    # def dispatch_line(self, frame):
+    #     logging.debug(f"[DEBUGGER] dispatch_line called at frame {frame}")
+    #     self._debug_base.dispatch_line(self, frame)
+    #
+    # def dispatch_call(self, frame, arg):
+    #     logging.debug(f"[DEBUGGER] dispatch_call called at frame {frame} with arg {arg}")
+    #     self._debug_base.dispatch_call(self, frame, arg)
 
 
 class CustomTerminalPdb(CustomDebugger, TerminalPdb):
@@ -218,12 +212,13 @@ class Debugger:
         backend="ipdb",
         stopped_callback=None,
         exited_callback=None,
+        on_continue_callback=None,
         **kwargs,
     ):
         backend = backend.lower()
         self.stopped_callback = stopped_callback
         self.exited_callback = exited_callback
-
+        self.on_continue_callback = on_continue_callback
         if backend == "ipdb":
             self.debugger = CustomTerminalPdb(parent=self)
         elif backend == "pdb":
@@ -232,6 +227,9 @@ class Debugger:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
 
         self.backend = backend
+
+    def clear_exited(self):
+        self.debugger._exited = False
 
     def _on_stop(self, frame):
         logging.debug(
