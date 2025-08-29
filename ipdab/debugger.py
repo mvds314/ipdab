@@ -60,7 +60,11 @@ class CustomDebugger(ABC):
         # TODO: why do we notify here, wouldn't it make more sense to overload do_next or do_step?
         try:
             cmd = line.strip().lower()
-            if cmd in {"n", "s", "step", "next"}:
+            if (
+                cmd in {"n", "s", "step", "next"}
+                or cmd.startswith("j ")
+                or cmd.startswith("jump ")
+            ):
                 logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
                 if self.curframe is None:
                     logging.error(
