@@ -38,6 +38,8 @@ print("This will be debugged.")
 - [x] Test or add support for return
 - [x] Test or add support for until
 - [ ] Test on slower hardware
+  - [ ] It seems that dapuit is timing out
+  - [ ] Try to start it with fewer windows
 - [ ] Fix compatiblity with ipython 9.1.0 and higher, entering the debugger seems to break
 - [ ] Create a pypi package
   - [ ] Update the documentation
