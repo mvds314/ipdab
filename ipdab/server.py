@@ -83,11 +83,6 @@ class IPDBAdapterServer:
         """
         Ensure the server is properly shutdown when the adapter is deleted.
         """
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        logging.debug(
-            f"[IPDB Server {function_name} {in_thread}]: Deleting IPDBAdapterServer instance, shutting down server"
-        )
         self.shutdown()
 
     @property
@@ -129,12 +124,9 @@ class IPDBAdapterServer:
         return f"Content-Length: {len(body)}\r\n\r\n{body}".encode()
 
     async def send_event(self, event_body):
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        function_name = inspect.currentframe().f_code.co_name
         event_msg = {"type": "event", "seq": 0, **event_body}
         self.client_writer.write(self.encode_dap_message(event_msg))
         await self.client_writer.drain()
-        logging.debug(f"[IPDB Server {function_name} {in_thread}] Sent event: {event_msg}")
 
     @property
     def client_connected(self):
@@ -156,28 +148,18 @@ class IPDBAdapterServer:
     def stopped_callback(self, reason="breakpoint"):
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         function_name = inspect.currentframe().f_code.co_name
-        logging.debug(
-            f"[IPDB Server {function_name} {in_thread}] Stopped callback called: {reason}"
-        )
         if self._shutdown_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Shutdown event set, not notifying stopped"
-            )
             return
         elif self.server_running:
             asyncio.run_coroutine_threadsafe(
                 self.notify_stopped(reason=reason), self.runner._loop
             ).result()
-            logging.debug("[DEBUGGER] Stopped callback awaited.")
         else:
-            msg = "[DEBUGGER] Server is not running, skipping stopped notification."
+            msg = f"[IPDB Server {function_name} {in_thread}] Server is not running, skipping stopped notification."
             logging.debug(msg)
 
     async def notify_stopped(self, reason="breakpoint"):
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        function_name = inspect.currentframe().f_code.co_name
         if self.client_connected:
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying stopped: {reason}")
             await self.send_event(
                 {
                     "event": "stopped",
@@ -188,10 +170,6 @@ class IPDBAdapterServer:
                     },
                 }
             )
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No client connected, cannot notify stopped: {reason}"
-            )
 
     def exited_callback(self, reason="exited"):
         """
@@ -199,26 +177,14 @@ class IPDBAdapterServer:
         And shutdown the debug adapter server.
         This method is called from the debugger when it exits, i.e., once we do set_quit.
         """
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
-        function_name = inspect.currentframe().f_code.co_name
-        logging.debug(
-            f"[IPDB Server {function_name} {in_thread}] Exited callback called: {reason}"
-        )
         if self._shutdown_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Shutdown event set, not notifying exited"
-            )
             return
         elif self._exited_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Exited event already set, not notifying exited again"
-            )
             return
         elif self.server_running:
             asyncio.run_coroutine_threadsafe(
                 self.notify_exited(reason=reason), self.runner._loop
             ).result()
-            logging.debug("[DEBUGGER] Exited callback awaited.")
         else:
             msg = "[DEBUGGER] No runner available for exited callback."
             logging.error(msg)
@@ -229,25 +195,14 @@ class IPDBAdapterServer:
         Notify the client that the program has exited.
         And shutdown the debug adapter server.
         """
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self._exited_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Exited event already set, not notifying exited again"
-            )
             return
         else:
             self._exited_event.set()
         if self.client_connected:
             if self._terminated_event.is_set():
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Terminated event already set, not notifying exited again"
-                )
                 return
             else:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Notifying exited: {reason}"
-                )
                 await self.send_event(
                     {
                         "event": "exited",
@@ -255,44 +210,29 @@ class IPDBAdapterServer:
                     }
                 )
                 await self.notify_terminated(reason)
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No client connected, cannot notify exited: {reason}"
-            )
-        logging.debug(f"[IPDB Server {function_name} {in_thread}] Exiting debug adapter server")
         await self.shutdown_server()
 
     async def notify_terminated(self, reason="terminated"):
         """
         Notify the client that the debug adapter server is terminating.
         """
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self._terminated_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Terminated event already set, not notifying terminated again"
-            )
             return
         else:
             self._terminated_event.set()
         if self.client_connected:
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Notifying terminated")
             await self.send_event(
                 {
                     "event": "terminated",
                     "body": {reason: reason},
                 }
             )
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No client connected, cannot notify terminated"
-            )
 
     async def handle_client(self, reader, writer):
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.client_connected:
-            logging.info(
+            logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Client already connected, disconnecting old client"
             )
             self.disconnect_client()
@@ -338,14 +278,8 @@ class IPDBAdapterServer:
                 }
                 cmd = msg.get("command")
                 if cmd == "initialize":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Initialize command received"
-                    )
                     response["body"] = {"supportsConfigurationDoneRequest": True}
                 elif cmd == "launch":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Launch command received, initializing debugger"
-                    )
                     response["body"] = {}
                     await self.send_event({"event": "initialized", "body": {}})
                 elif cmd == "continue":
@@ -379,9 +313,6 @@ class IPDBAdapterServer:
                     response["success"] = False
                     response["message"] = "Next commands can only be sent through terminal"
                 elif cmd == "configurationDone":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] ConfigurationDone command received"
-                    )
                     response["body"] = {}
                     await self.send_event(
                         {
@@ -390,14 +321,8 @@ class IPDBAdapterServer:
                         }
                     )
                 elif cmd == "threads":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Threads command received"
-                    )
                     response["body"] = {"threads": [{"id": 1, "name": "MainThread"}]}
                 elif cmd == "stackTrace":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] StackTrace command received"
-                    )
                     frames = []
                     if self.debugger.curframe:
                         f = self.debugger.curframe
@@ -417,9 +342,6 @@ class IPDBAdapterServer:
                             i += 1
                     response["body"] = {"stackFrames": frames, "totalFrames": len(frames)}
                 elif cmd == "scopes":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Scopes command received"
-                    )
                     frame_id = msg.get("arguments", {}).get("frameId", 0)
                     response["body"] = {
                         "scopes": [
@@ -436,9 +358,6 @@ class IPDBAdapterServer:
                         ]
                     }
                 elif cmd == "variables":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Variables command received"
-                    )
                     var_ref = msg.get("arguments", {}).get("variablesReference", 0)
                     frame = self.debugger.curframe
                     variables = []
@@ -454,9 +373,6 @@ class IPDBAdapterServer:
                             )
                     response["body"] = {"variables": variables}
                 elif cmd == "evaluate":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Evaluate command received"
-                    )
                     expr = msg.get("arguments", {}).get("expression", "")
                     try:
                         # Evaluate expression in ipdb debugger context
@@ -467,9 +383,6 @@ class IPDBAdapterServer:
                     except Exception as e:
                         response["body"] = {"result": f"Error: {e}", "variablesReference": 0}
                 elif cmd == "setBreakpoints":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] SetBreakpoints command received"
-                    )
                     args = msg.get("arguments", {})
                     source = args.get("source", {})
                     path = source.get("path", "")
@@ -486,16 +399,10 @@ class IPDBAdapterServer:
                             actual_bps.append({"verified": True, "line": line})
                     response["body"] = {"breakpoints": actual_bps}
                 elif cmd == "setExceptionBreakpoints":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] SetExceptionBreakpoints command received"
-                    )
                     # You can store exception breakpoints info if needed or just acknowledge
                     response["body"] = {}
                     # For now, just acknowledge success; real implementation would configure exception breakpoints in debugger
                 elif cmd == "source":
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Source command received"
-                    )
                     args = msg.get("arguments", {})
                     # For simplicity, handle only file path sources (no binary or compiled sources)
                     if "path" in args.get("source", {}):
@@ -518,7 +425,7 @@ class IPDBAdapterServer:
                     response["message"] = "Disassemble not supported in this debugger"
                 elif cmd == "disconnect":
                     logging.info(
-                        f"[IPDB Server {function_name} {in_thread}] Disconnect command recived, client disconnected"
+                        f"[IPDB Server {function_name} {in_thread}] Disconnect command recived"
                     )
                     response["success"] = True
                     response["message"] = "Disconnecting client"
@@ -536,42 +443,27 @@ class IPDBAdapterServer:
                     or self._exited_event.is_set()
                     or self._terminated_event.is_set()
                 ):
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
-                    )
                     break
                 if cmd == "disconnect":
                     break
                 else:
                     writer.write(self.encode_dap_message(response))
                     await writer.drain()
-                    # logging.debug(
-                    #     f"[IPDB Server {function_name} {in_thread}] Sent response: {response}"
-                    # )
                 if (
                     self._shutdown_event.is_set()
                     or self._exited_event.is_set()
                     or self._terminated_event.is_set()
                 ):
-                    logging.debug(
-                        f"[IPDB Server {function_name} {in_thread}] Shutdown event set, closing client connection"
-                    )
                     break
         finally:
             await self.disconnect_client()
 
     async def disconnect_client(self):
-        function_name = inspect.currentframe().f_code.co_name
-        in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if self.client_connected:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Disconnecting client: {self.client_writer.get_extra_info('peername')}"
-            )
             self.client_writer.close()
             await self.client_writer.wait_closed()
             self.client_writer = None
             self.client_reader = None
-            logging.debug("[IPDB Server {function_name} {in_thread}] Client disconnected")
 
     async def background_server(self):
         """
@@ -586,19 +478,10 @@ class IPDBAdapterServer:
             logging.error(msg)
             raise RuntimeError(msg)
         if self._shutdown_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set shutdown event"
-            )
             self._shutdown_event.clear()
         if self._exited_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set exited event"
-            )
             self._exited_event.clear()
         if self._terminated_event.is_set():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Restarting server, clearing previously set terminated event"
-            )
             self._terminated_event.clear()
         self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
         logging.info(
@@ -638,7 +521,6 @@ class IPDBAdapterServer:
         try:
             await self.server_task
         except asyncio.CancelledError:
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Server task cancelled")
             pass
 
     def shutdown(self):
@@ -652,29 +534,12 @@ class IPDBAdapterServer:
             raise RuntimeError("Cannot shutdown server from within the event loop thread")
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
         # Handle case where there is no loop or loop is already closed
-        if self.server_task is None:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] No server task to cancel, nothing to do"
-            )
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Cancelling server task and shutting down server"
-            )
+        if self.server_task is not None:
             asyncio.run_coroutine_threadsafe(self.shutdown_server(), self.runner._loop).result()
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Server task cancelled and server shutdown completed"
-            )
         if self.runner is None and (self.server is not None or self.server_task is not None):
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop is None, but server is running, cannot shutdown"
             logging.error(msg)
             raise RuntimeError(msg)
-        if self.runner is not None and self.runner._loop.is_running():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Event loop is still running, cannot join thread"
-            )
-        logging.debug(
-            f"[IPDB Server {function_name} {in_thread}] Waiting for event loop thread to finish"
-        )
         self.thread.join()
         if self.thread.is_alive():
             msg = f"[IPDB Server {function_name} {in_thread}] Event loop thread is still alive after closing the loop"
@@ -695,25 +560,10 @@ class IPDBAdapterServer:
         logging.info(f"[IPDB Server {function_name} {in_thread}] Shutting down DAP server")
         # Set the shutdown event to prevent multiple shutdown calls
         if not self._shutdown_event.is_set():
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] Setting shutdown event")
             self._shutdown_event.set()
             # Only notify the client once, we set the shutdown event afterwards
             if self.client_connected:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown"
-                )
                 await self.notify_terminated("shutdown")
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Notifying client of shutdown completed"
-                )
-            else:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] No client connected or already notified, skipping shutdown notification"
-                )
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Shutdown event already set, skipping shutdown notification"
-            )
         # Handle some edge cases
         if self.runner is not None:
             if self.server is None or self.server_task is None:
@@ -722,25 +572,16 @@ class IPDBAdapterServer:
                 )
                 raise RuntimeError("Event loop is not running, cannot shutdown server")
         else:
-            # We are already shut down
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Server is already shut down, nothing to do"
-            )
             return
         # Shutdown the server by cancelling the server task if it is not done
         if self.server_task is not None and not self.server_task.done():
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Cancelling running server task"
-            )
             if self._read_dap_message_task is not None and not self._read_dap_message_task.done():
                 self._read_dap_message_task.cancel()
             self.server_task.cancel()
             try:
                 await self.server_task
             except asyncio.CancelledError:
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Server task cancelled successfully"
-                )
+                pass
             except Exception as e:
                 logging.error(
                     f"[IPDB Server {function_name} {in_thread}] Error while cancelling server task: {e}"
@@ -748,9 +589,6 @@ class IPDBAdapterServer:
                 raise
             finally:
                 self.server_task = None
-                logging.debug(
-                    f"[IPDB Server {function_name} {in_thread}] Server shutdown completed"
-                )
 
     def run_loop(self):
         """
@@ -767,9 +605,7 @@ class IPDBAdapterServer:
         finally:
             msg = "with" if self._shutdown_event.is_set() else "without"
             msg = f"Event loop stopping, {msg} shutdown event set"
-            # TODO: continue here, how can it be that we set runner to None while server is not None yet
             self.runner = None
-            logging.debug(f"[IPDB Server {function_name} {in_thread}] {msg}")
 
     def start_in_thread(self, max_wait_time=5):
         self.thread = threading.Thread(target=self.run_loop, daemon=True)
@@ -801,17 +637,10 @@ class IPDBAdapterServer:
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         self.on_continue = on_continue
         if not self.server:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] Starting DAP server in a new thread"
-            )
             self.start_in_thread()
             self._shutdown_event.clear()
             self._exited_event.clear()
             self._terminated_event.clear()
-        else:
-            logging.debug(
-                f"[IPDB Server {function_name} {in_thread}] DAP server already running, setting trace"
-            )
         # Enter ipdb prompt here
         try:
             return self.debugger.set_trace(frame=frame)
@@ -847,11 +676,8 @@ def set_trace(on_continue="keep_running"):
         - "exit": Exit the debug server even if there are break points set.
         - "keep_running": Keep the debug server running after continue, allowing future `set_trace` calls to re-enter the debugger.
     """
-    function_name = inspect.currentframe().f_code.co_name
-    logging.debug(f"[IPDB Server {function_name}] Setting trace in IPDB adapter")
     frame = inspect.currentframe().f_back
     retval = ipdab.set_trace(frame=frame, on_continue=on_continue)
-    logging.debug(f"[IPDB Server {function_name}] Trace set, returning from set_trace")
     return retval
 
 

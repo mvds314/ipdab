@@ -38,9 +38,6 @@ class CustomDebugger(ABC):
         is always called before the cmd
         """
         try:
-            logging.debug(
-                f"[DEBUGGER] Debugger command loop started at frame {self.curframe}; Notifing parent _on_stop"
-            )
             if self.curframe is None:
                 logging.error("[DEBUGGER] curframe is None in preloop")
             else:
@@ -67,7 +64,6 @@ class CustomDebugger(ABC):
                 or cmd.startswith("unt ")
                 or cmd.startswith("until ")
             ):
-                logging.debug(f"[DEBUGGER] Post command '{cmd}' received; calling _on_stop")
                 if self.curframe is None:
                     logging.error(
                         f"[DEBUGGER] Post command '{cmd}' received while curframe is None"
@@ -96,20 +92,12 @@ class CustomDebugger(ABC):
             on_continue = self._parent.on_continue_callback()
             if on_continue == "exit_without_breakpoint":
                 if not self.breaks:
-                    logging.debug(
-                        f"[DEBUGGER] set_continue called with `{on_continue}` and no breaks, calling _on_exit once"
-                    )
                     self.call_on_exit_once()
-                    logging.debug("[DEBUGGER] Calling _on_exit completed")
             elif on_continue == "exit":
-                logging.debug(
-                    f"[DEBUGGER] set_continue called with `{on_continue}`, calling _on_exit once"
-                )
                 self.call_on_exit_once()
-                logging.debug("[DEBUGGER] Calling _on_exit completed")
             elif on_continue == "keep_running":
                 # TODO: try to do something here
-                logging.debug("[DEBUGGER] set_continue called with `keep_running`, continuing")
+                pass
             else:
                 raise ValueError(f"Invalid on_continue return value: {on_continue}")
         self._debug_base.set_continue(self)
@@ -122,9 +110,7 @@ class CustomDebugger(ABC):
         the `set_trace` method merely injects callbacks into the interpreter that cause the
         debugger to stop at breakpoints and such.
         """
-        logging.debug("[DEBUGGER] set_quit called, calling _on_exit once")
         self.call_on_exit_once()
-        logging.debug("[DEBUGGER] Calling _on_exit completed")
         return self._debug_base.set_quit(self)
 
     def call_on_exit_once(self):
@@ -133,10 +119,8 @@ class CustomDebugger(ABC):
         This method should be overridden by subclasses to handle exit logic.
         """
         if self._exited:
-            logging.debug("[DEBUGGER] _exit called, but already exited")
             return
         else:
-            logging.debug("[DEBUGGER] _exit called, calling _on_exit")
             self._parent._on_exit()
             self._exited = True
 
@@ -148,7 +132,6 @@ class CustomDebugger(ABC):
     #         logging.debug("[DEBUGGER] dispatch_return at botframe, calling _on_exit once")
     #         self.call_on_exit_once()
     #     self._debug_base.dispatch_return(self, frame, arg)
-
     # def dispatch_exception(self, frame, arg):
     #     logging.debug(f"[DEBUGGER] dispatch_exception called at frame {frame} with arg {arg}")
     #     self._debug_base.dispatch_exception(self, frame, arg)
@@ -185,7 +168,6 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
         skip.append("threading")
         CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
-        logging.debug("[CustomTerminalPdb] Initialized")
 
 
 class CustomPdb(CustomDebugger, pdb.Pdb):
@@ -208,7 +190,6 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
         skip.append("ipdab.*")
         CustomDebugger.__init__(self, pdb.Pdb, parent)
         pdb.Pdb.__init__(self, *args, skip=skip, **kwargs)
-        logging.debug("[CustomPdb] Initialized")
 
 
 class Debugger:
@@ -238,29 +219,17 @@ class Debugger:
         self.debugger._exited = False
 
     def _on_stop(self, frame):
-        logging.debug(
-            f"[DEBUGGER] _on_stop called for {frame.f_code.co_filename}:{frame.f_lineno}"
-        )
         if self.stopped_callback:
             self.stopped_callback(reason="breakpoint")
-            logging.debug("[DEBUGGER] Stopped callback executed.")
-        else:
-            logging.debug("[DEBUGGER] No stopped callback set.")
 
     def _on_exit(self):
-        logging.debug("[DEBUGGER] Debugger is exiting")
         if self.exited_callback:
             self.exited_callback(reason="exited")
-            logging.debug("[DEBUGGER] Exited callback executed.")
-        else:
-            logging.debug("[DEBUGGER] No exited callback set.")
 
     def set_trace(self, frame=None):
-        logging.debug("[DEBUGGER] Trace set, entering debugger.")
         try:
             return self.debugger.set_trace(frame=frame)
         except (BdbQuit, SystemExit):
-            logging.debug("[DEBUGGER] BdbQuit or SystemExit caught, calling _on_exit")
             self.debugger.call_on_exit_once()
         except Exception as e:
             logging.error(f"[DEBUGGER] Error in set_trace: {e}")
