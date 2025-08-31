@@ -50,19 +50,45 @@ print("This will be debugged.")
 
 Now, connect your IDE to the DAP server started by `ipdab`.
 
-TODO: an example for Neovim will follow
+## Neovim
+
+In Neovim, this could work by adding an extry entry to your `dap.adapters` and `dap.configurations`:
+
+```lua
+local dap = require "dap"
+
+-- Custom DAP adapter for ipdb
+dap.adapters.ipdb = {
+  type = "server",
+  host = "127.0.0.1",
+  port = 9000,
+}
+
+-- Attach config — does not launch, just connects
+dap.configurations.python = dap.configurations.python or {}
+table.insert(dap.configurations.python, {
+  name = "Attach to ipdb",
+  type = "ipdb",
+  request = "launch", -- <-- important to say launch here!
+  program = "${file}",
+  justMyCode = false,
+  cwd = vim.fn.getcwd(),
+})
+```
+
+Then, start your Python script any way you want, e,g., with `python your_script.py` or `ipython -i your_script.py`.
+When the execution hits the `ipdab.set_trace()` line, the DAP server will start and you can connect to it from Neovim with `:lua require'dap'.continue()`.
+
+## VS Code
+
+Should work similar to Neovim, not tested yet.
 
 # TODO
 
-- [x] Add Neovim shortcuts
-- [x] Add support for j, as in jump
-- [x] Test or add support for return
-- [x] Test or add support for until
 - [ ] Test on slower hardware
   - [ ] It seems that dapuit is timing out
   - [ ] Try to start it with fewer windows
-- [ ] Create a pypi package
-  - [ ] Cleanup the repo
+- [ ] Cleanup the repo
 - [ ] Create a Neovim plugin
 - [ ] Write a blog post about debugging
 
