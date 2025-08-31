@@ -40,7 +40,6 @@ print("This will be debugged.")
 - [ ] Test on slower hardware
   - [ ] It seems that dapuit is timing out
   - [ ] Try to start it with fewer windows
-- [ ] Fix compatiblity with ipython 9.1.0 and higher, entering the debugger seems to break
 - [ ] Create a pypi package
   - [ ] Update the documentation
   - [ ] Cleanup the repo
@@ -48,8 +47,9 @@ print("This will be debugged.")
 - [ ] Create a Neovim plugin
 - [ ] Write a blog post about debugging
 
-# later
+# Later
 
+- [ ] Fix compatiblity with ipython 9.1.0 and higher, entering the debugger seems to break
 - [ ] Check how ipdab works with module reloads
 - [ ] Consider post mortem support
 
