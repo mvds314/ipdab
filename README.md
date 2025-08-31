@@ -91,6 +91,7 @@ Should work similar to Neovim, not tested yet.
 - [ ] Cleanup the repo
 - [ ] Create a Neovim plugin
 - [ ] Write a blog post about debugging
+- [ ] Connect pdb backend in addition to ipdb backend
 
 - [ ] Fix compatiblity with ipython 9.1.0 and higher, entering the debugger seems to break
 - [ ] Check how ipdab works with module reloads
