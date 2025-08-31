@@ -88,7 +88,6 @@ Should work similar to Neovim, not tested yet.
 - [ ] Test on slower hardware
   - [ ] It seems that dapuit is timing out
   - [ ] Try to start it with fewer windows
-- [ ] Cleanup the repo
 - [ ] Create a Neovim plugin
 - [ ] Write a blog post about debugging
 - [ ] Connect pdb backend in addition to ipdb backend
