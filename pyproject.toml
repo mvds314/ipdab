@@ -1,7 +1,7 @@
 [project]
 name = "ipdab"
 description = "The Debug Adapter Protocol (DAP) implementation for the ipdb debugger."
-version = "25.8.1"
+version = "25.8.2"
 authors = [{ name = "Martin van der Schans" }]
 readme = "README.md"
 keywords = ["debugger", "dap", "ipdb", "debug-adapter-protocol", "python"]
