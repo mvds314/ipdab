@@ -55,7 +55,7 @@ class IPDBAdapterServer:
     """
 
     def __init__(
-        self, host="127.0.0.1", port=9000, debugger="ipdb", on_continue="exit_without_breakpoint"
+        self, host="localhost", port=9000, debugger="ipdb", on_continue="exit_without_breakpoint"
     ):
         # TODO: refactor to private attributes
         self.host = host

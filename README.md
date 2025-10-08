@@ -60,7 +60,7 @@ local dap = require "dap"
 -- Custom DAP adapter for ipdb
 dap.adapters.ipdb = {
   type = "server",
-  host = "127.0.0.1",
+  host = "localhost",
   port = 9000,
 }
 
