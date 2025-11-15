@@ -25,6 +25,8 @@ time.sleep(1)
 
 ipdab.set_trace(on_continue="keep_running")  # Debugger will stop here
 
+time.sleep(1)
+
 x = 10
 ipdab.set_trace(on_continue="exit_without_breakpoint")
 y = 2 * myfun(x)
