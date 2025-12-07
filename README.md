@@ -88,10 +88,10 @@ Should work similar to Neovim, not tested yet.
 - [ ] Test on slower hardware
   - [ ] It seems that dapuit is timing out
   - [ ] Try to start it with fewer windows
-- [ ] Create a Neovim plugin
 - [ ] Write a blog post about debugging
 - [ ] Connect pdb backend in addition to ipdb backend
 
+- [ ] Both preloop can postcmd send the on_stop event. This leads to sending on_stop event twice. Check if both are needed.
 - [ ] Fix compatiblity with ipython 9.1.0 and higher, entering the debugger seems to break
 - [ ] Check how ipdab works with module reloads
 - [ ] Consider post mortem support
