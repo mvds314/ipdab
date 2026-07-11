@@ -110,7 +110,13 @@ class IPDBAdapterServer:
     async def read_dap_message(self, reader):
         header = b""
         while not header.endswith(b"\r\n\r\n"):
-            header += await reader.read(1)
+            chunk = await reader.read(1)
+            if not chunk:
+                # Peer closed the connection: reader.read() returns b"" immediately
+                # once EOF is reached, so without this check the loop above never
+                # awaits again and spins forever on the event-loop thread.
+                return None
+            header += chunk
         header_text = header.decode()
         content_length = 0
         for line in header_text.strip().split("\r\n"):
@@ -224,7 +230,7 @@ class IPDBAdapterServer:
             await self.send_event(
                 {
                     "event": "terminated",
-                    "body": {reason: reason},
+                    "body": {"reason": reason},
                 }
             )
 
@@ -235,7 +241,7 @@ class IPDBAdapterServer:
             logging.debug(
                 f"[IPDB Server {function_name} {in_thread}] Client already connected, disconnecting old client"
             )
-            self.disconnect_client()
+            await self.disconnect_client()
         try:
             logging.info(f"[IPDB Server {function_name} {in_thread}] New client connection")
             self.client_reader = reader
@@ -435,9 +441,6 @@ class IPDBAdapterServer:
                     )
                     response["success"] = False
                     response["message"] = f"Unsupported command: {cmd}"
-                    logging.warning(
-                        f"[IPDB Server {function_name} {in_thread}] Unsupported command: {cmd}"
-                    )
                 if (
                     self._shutdown_event.is_set()
                     or self._exited_event.is_set()
@@ -456,7 +459,14 @@ class IPDBAdapterServer:
                 ):
                     break
         finally:
-            await self.disconnect_client()
+            # Only tear down shared client state if it still refers to *this*
+            # connection. A newer client may already have taken over (kicking
+            # this one via disconnect_client() at the top of its own handler);
+            # in that case this connection's writer is already closed, and
+            # touching self.client_writer/self.client_reader here would
+            # incorrectly disconnect the newer client instead.
+            if self.client_writer is writer:
+                await self.disconnect_client()
 
     async def disconnect_client(self):
         if self.client_connected:
@@ -528,6 +538,8 @@ class IPDBAdapterServer:
         Cleanup logic for the event loop started in start_in_thread.
         Shutdown the DAP server and the loop gracefully.
         """
+        if self.thread is None:
+            return
         function_name = inspect.currentframe().f_code.co_name
         in_thread = "in thread" if threading.current_thread() == self.thread else "in main thread"
         if threading.current_thread() == self.thread:
@@ -612,7 +624,7 @@ class IPDBAdapterServer:
         self.thread.start()
         t = time.time()
         dt = min(0.1, max_wait_time / 10)
-        while t < time.time() + max_wait_time:
+        while time.time() < t + max_wait_time:
             try:
                 server_running = self.server_running
             except RuntimeError as e:
