@@ -8,6 +8,24 @@ from bdb import BdbQuit
 from IPython.terminal.debugger import TerminalPdb
 
 
+def _stdlib_skip_patterns():
+    """
+    Skip patterns covering every stdlib module and its submodules.
+
+    `pkgutil.iter_modules` only returns top-level names (e.g. "concurrent"),
+    but pdb's skip matching does an fnmatch on the full dotted module name of
+    each frame, so a bare top-level entry never matches a submodule like
+    "concurrent.futures.thread". Emit both the bare name and a "name.*"
+    wildcard for every top-level module so submodules are covered too.
+    """
+    stdlib_path = sysconfig.get_paths()["stdlib"]
+    patterns = []
+    for module_info in pkgutil.iter_modules([stdlib_path]):
+        patterns.append(module_info.name)
+        patterns.append(f"{module_info.name}.*")
+    return patterns
+
+
 class CustomDebugger(ABC):
     """
     Base class for custom debuggers.
@@ -153,19 +171,10 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
 
     def __init__(self, parent, *args, **kwargs):
         skip = kwargs.pop("skip", [])
-        # Add all standard library modules to skip
-        stdlib_path = sysconfig.get_paths()["stdlib"]
-        stdlib_modules = set()
-        for module_info in pkgutil.iter_modules([stdlib_path]):
-            stdlib_modules.add(module_info.name)
-        # Add patterns for all stdlib modules
-        for mod in stdlib_modules:
-            skip.append(mod)
+        skip.extend(_stdlib_skip_patterns())
         # Additional modules to skip
         skip.append("ipdab.*")
         skip.append("IPython.terminal.debugger")
-        skip.append("concurrent.futures.*")
-        skip.append("threading")
         CustomDebugger.__init__(self, TerminalPdb, parent)
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
 
@@ -178,14 +187,7 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
 
     def __init__(self, parent, *args, **kwargs):
         skip = kwargs.pop("skip", [])
-        # Add all standard library modules to skip
-        stdlib_path = sysconfig.get_paths()["stdlib"]
-        stdlib_modules = set()
-        for module_info in pkgutil.iter_modules([stdlib_path]):
-            stdlib_modules.add(module_info.name)
-        # Add patterns for all stdlib modules
-        for mod in stdlib_modules:
-            skip.append(mod)
+        skip.extend(_stdlib_skip_patterns())
         # Additional modules to skip
         skip.append("ipdab.*")
         CustomDebugger.__init__(self, pdb.Pdb, parent)
