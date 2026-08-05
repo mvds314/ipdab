@@ -1,11 +1,142 @@
+import fnmatch
 import logging
+import os
 import pdb
-import pkgutil
+import re
+import site
+import sys
 import sysconfig
 from abc import ABC, abstractmethod
 from bdb import BdbQuit
 
 from IPython.terminal.debugger import TerminalPdb
+
+#: Modules that drive the debugger itself. Stepping into these is always an accident,
+#: so they are skipped on top of whatever :class:`SkipMatcher` classifies as library code.
+DEFAULT_SKIP = (
+    "ipdab.*",
+    "IPython.terminal.debugger",
+    "concurrent.futures.*",
+    "threading",
+)
+
+_WILDCARD = re.compile(r"[*?\[]")
+
+
+def library_roots():
+    """
+    The directories that hold non-user code: the standard library and every
+    site-packages directory known to this interpreter.
+
+    Enumerating directories rather than module names matters. A virtual environment
+    built on top of a base installation resolves imports from several site-packages
+    directories at once, and an editable install lives outside all of them, so any
+    name-based list is both incomplete and wrong about the user's own packages.
+    """
+    roots = set()
+    paths = sysconfig.get_paths()
+    for key in ("stdlib", "platstdlib", "purelib", "platlib"):
+        path = paths.get(key)
+        if path:
+            roots.add(os.path.normcase(os.path.realpath(path)))
+    for getter in ("getsitepackages", "getusersitepackages"):
+        try:
+            found = getattr(site, getter)()
+        except (AttributeError, TypeError):
+            continue
+        if isinstance(found, str):
+            found = [found]
+        for path in found or []:
+            roots.add(os.path.normcase(os.path.realpath(path)))
+    return frozenset(roots)
+
+
+class SkipMatcher:
+    """
+    Decide whether a module should be skipped by the debugger, quickly.
+
+    `bdb.Bdb.is_skipped_module` walks the whole skip list with `fnmatch` on *every*
+    call and line event. With a list of any size that dominates the run time of a
+    traced program, and it is paid most heavily by modules that are *not* skipped,
+    because a miss has to compare against every pattern. Two things fix that:
+
+    - Patterns without wildcards go into a set, the rest into one compiled regex.
+    - Every answer is memoised. Trace events repeat the same handful of module
+      names endlessly, so the second lookup onwards is a dict hit.
+
+    Parameters
+    ----------
+    patterns : iterable of str, optional
+        `fnmatch` patterns of module names to skip, e.g. ``"mypkg.*"``.
+    skip_libraries : bool, optional
+        Skip any module whose file lives under :func:`library_roots`, plus builtin
+        and frozen modules. This is the "only stop in my own code" behaviour and is
+        what keeps the debugger out of heavy third party call stacks. Default True.
+    unskip : iterable of str, optional
+        `fnmatch` patterns that win over `skip_libraries`, to step into one library
+        anyway. Explicit `patterns` still take precedence over these.
+    """
+
+    def __init__(self, patterns=(), skip_libraries=True, unskip=()):
+        self._literals, self._regex = self._compile(patterns)
+        self._unskip_literals, self._unskip_regex = self._compile(unskip)
+        self.skip_libraries = skip_libraries
+        self.roots = library_roots() if skip_libraries else frozenset()
+        self._cache = {}
+
+    @staticmethod
+    def _compile(patterns):
+        literals, wildcards = set(), []
+        for pattern in patterns or ():
+            if _WILDCARD.search(pattern):
+                wildcards.append(pattern)
+            else:
+                literals.add(pattern)
+        regex = None
+        if wildcards:
+            regex = re.compile("|".join(fnmatch.translate(p) for p in wildcards))
+        return literals, regex
+
+    @staticmethod
+    def _matches(module_name, literals, regex):
+        if module_name in literals:
+            return True
+        return regex is not None and regex.match(module_name) is not None
+
+    def _is_library(self, module_name):
+        """Whether `module_name` resolves to a file below one of :attr:`roots`."""
+        module = sys.modules.get(module_name)
+        if module is None:
+            # Not imported (or synthetic globals from exec): assume user code and trace it.
+            return False
+        filename = getattr(module, "__file__", None)
+        if filename is None:
+            return True  # builtin or frozen, there is no source to step through
+        filename = os.path.normcase(os.path.realpath(filename))
+        return any(filename == root or filename.startswith(root + os.sep) for root in self.roots)
+
+    def _classify(self, module_name):
+        if self._matches(module_name, self._literals, self._regex):
+            return True
+        if not self.skip_libraries:
+            return False
+        if self._matches(module_name, self._unskip_literals, self._unskip_regex):
+            return False
+        return self._is_library(module_name)
+
+    def __call__(self, module_name):
+        if module_name is None:  # some modules do not have names
+            return False
+        try:
+            return self._cache[module_name]
+        except KeyError:
+            pass
+        result = self._classify(module_name)
+        # Only remember a negative verdict once the module is importable, otherwise a
+        # lookup made before the import completed would pin it to "user code" forever.
+        if result or module_name in sys.modules:
+            self._cache[module_name] = result
+        return result
 
 
 class CustomDebugger(ABC):
@@ -15,17 +146,33 @@ class CustomDebugger(ABC):
     """
 
     @abstractmethod
-    def __init__(self, debug_base, parent):
+    def __init__(self, debug_base, parent, skip=(), skip_libraries=True, unskip=()):
         """
         Initialize the custom debugger with a parent reference.
 
         Implementation should handle setting up the debugger
 
         :param parent: Reference to the parent object that will handle callbacks.
+        :param skip: Extra `fnmatch` patterns of module names to skip.
+        :param skip_libraries: Skip the standard library and site-packages, so the
+            debugger only stops in your own code. See :class:`SkipMatcher`.
+        :param unskip: Patterns that override `skip_libraries` for selected modules.
         """
         self._debug_base = debug_base
         self._parent = parent
         self._exited = False
+        self._skip_matcher = SkipMatcher(
+            patterns=skip, skip_libraries=skip_libraries, unskip=unskip
+        )
+
+    def is_skipped_module(self, module_name):
+        """
+        Override of `bdb.Bdb.is_skipped_module` using the cached :class:`SkipMatcher`.
+
+        Note `bdb.Bdb.stop_here` only consults this when `self.skip` is non-empty, which
+        is why the backends always pass :data:`DEFAULT_SKIP` through to `bdb`.
+        """
+        return self._skip_matcher(module_name)
 
     def preloop(self):
         """
@@ -152,21 +299,12 @@ class CustomTerminalPdb(CustomDebugger, TerminalPdb):
     """
 
     def __init__(self, parent, *args, **kwargs):
-        skip = kwargs.pop("skip", [])
-        # Add all standard library modules to skip
-        stdlib_path = sysconfig.get_paths()["stdlib"]
-        stdlib_modules = set()
-        for module_info in pkgutil.iter_modules([stdlib_path]):
-            stdlib_modules.add(module_info.name)
-        # Add patterns for all stdlib modules
-        for mod in stdlib_modules:
-            skip.append(mod)
-        # Additional modules to skip
-        skip.append("ipdab.*")
-        skip.append("IPython.terminal.debugger")
-        skip.append("concurrent.futures.*")
-        skip.append("threading")
-        CustomDebugger.__init__(self, TerminalPdb, parent)
+        skip = list(kwargs.pop("skip", []) or []) + list(DEFAULT_SKIP)
+        skip_libraries = kwargs.pop("skip_libraries", True)
+        unskip = kwargs.pop("unskip", ())
+        CustomDebugger.__init__(
+            self, TerminalPdb, parent, skip=skip, skip_libraries=skip_libraries, unskip=unskip
+        )
         TerminalPdb.__init__(self, *args, skip=skip, **kwargs)
 
 
@@ -177,18 +315,12 @@ class CustomPdb(CustomDebugger, pdb.Pdb):
     """
 
     def __init__(self, parent, *args, **kwargs):
-        skip = kwargs.pop("skip", [])
-        # Add all standard library modules to skip
-        stdlib_path = sysconfig.get_paths()["stdlib"]
-        stdlib_modules = set()
-        for module_info in pkgutil.iter_modules([stdlib_path]):
-            stdlib_modules.add(module_info.name)
-        # Add patterns for all stdlib modules
-        for mod in stdlib_modules:
-            skip.append(mod)
-        # Additional modules to skip
-        skip.append("ipdab.*")
-        CustomDebugger.__init__(self, pdb.Pdb, parent)
+        skip = list(kwargs.pop("skip", []) or []) + list(DEFAULT_SKIP)
+        skip_libraries = kwargs.pop("skip_libraries", True)
+        unskip = kwargs.pop("unskip", ())
+        CustomDebugger.__init__(
+            self, pdb.Pdb, parent, skip=skip, skip_libraries=skip_libraries, unskip=unskip
+        )
         pdb.Pdb.__init__(self, *args, skip=skip, **kwargs)
 
 
@@ -207,9 +339,9 @@ class Debugger:
         self.exited_callback = exited_callback
         self.on_continue_callback = on_continue_callback
         if backend == "ipdb":
-            self.debugger = CustomTerminalPdb(parent=self)
+            self.debugger = CustomTerminalPdb(self, *args, **kwargs)
         elif backend == "pdb":
-            self.debugger = CustomPdb(parent=self)
+            self.debugger = CustomPdb(self, *args, **kwargs)
         else:
             raise ValueError(f"Unsupported debugger: {backend}. Use 'ipdb' or 'pdb'.")
 

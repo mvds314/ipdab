@@ -73,14 +73,38 @@ at the end (or wherever appropriate) or the real debugger behavior for that hook
 
 ### Skip lists
 
-`CustomTerminalPdb.__init__` and `CustomPdb.__init__` both build a `skip` list from
-every top-level stdlib module name (via `pkgutil.iter_modules([sysconfig.get_paths()["stdlib"]])`)
-plus `"ipdab.*"`, so stepping never dives into stdlib or ipdab's own frames. The
-`ipdb`-backed variant additionally skips `"IPython.terminal.debugger"`,
-`"concurrent.futures.*"`, and `"threading"` — the plain `pdb` backend does not add
-these three. This looks like an unintentional asymmetry: a `backend="pdb"` user can end
-up stepping into `threading`/`concurrent.futures` frames that an `ipdb` user would skip
-right past.
+`CustomTerminalPdb.__init__` and `CustomPdb.__init__` both pass `DEFAULT_SKIP`
+(`"ipdab.*"`, `"IPython.terminal.debugger"`, `"concurrent.futures.*"`, `"threading"`)
+down to `bdb`, plus anything the caller supplies via `skip=`. Both backends now use the
+same list — the old asymmetry, where only the `ipdb` variant skipped
+`threading`/`concurrent.futures`, is gone.
+
+Everything else is decided by `SkipMatcher`, which `CustomDebugger.is_skipped_module`
+overrides `bdb.Bdb.is_skipped_module` with. Two things matter about it:
+
+- **It classifies by path, not by name.** `library_roots()` collects the stdlib and
+  *every* site-packages directory (`sysconfig` paths plus `site.getsitepackages()` and
+  `site.getusersitepackages()`), and a module counts as library code when its
+  `__file__` sits under one of them; builtin/frozen modules count too. This is what
+  gives "only stop in my own code". Enumerating module *names* — what the code used to
+  do with `pkgutil.iter_modules([sysconfig.get_paths()["stdlib"]])` — cannot work: a
+  venv layered on a base install resolves imports from several site-packages
+  directories, and an editable install lives outside all of them, so a name list both
+  misses third-party packages and risks mislabelling the user's own.
+- **It is cached, and that is a correctness-shaped performance fix.**
+  `bdb.Bdb.stop_here` calls `is_skipped_module` on *every call and every line event*,
+  and the stock implementation `fnmatch`es the entire skip list each time. The old
+  190-entry stdlib list therefore cost ~130 µs per event, and the cost fell hardest on
+  modules that were *not* skipped, since a miss compares against all 190 patterns.
+  Measured on a trivial `pandas` call: 221 ms traced under the old list vs 4.2 ms with
+  the matcher (745x vs 14x untraced). Wildcard patterns are compiled into one regex,
+  literals go in a set, and every verdict is memoised — a negative verdict only once
+  the module is in `sys.modules`, so a lookup made mid-import is not pinned forever.
+
+Escape hatches: `skip_libraries=False` disables the path-based classification entirely,
+and `unskip=[...]` re-enables stepping into named libraries (e.g. `["pandas.*"]`).
+Both are accepted by `Debugger(...)`, which now forwards `*args`/`**kwargs` to the
+backend instead of dropping them.
 
 ### `Debugger` façade
 
