@@ -2,6 +2,7 @@ import fnmatch
 import logging
 import os
 import pdb
+import pkgutil
 import re
 import site
 import sys
@@ -137,6 +138,24 @@ class SkipMatcher:
         if result or module_name in sys.modules:
             self._cache[module_name] = result
         return result
+
+
+def _stdlib_skip_patterns():
+    """
+    Skip patterns covering every stdlib module and its submodules.
+
+    `pkgutil.iter_modules` only returns top-level names (e.g. "concurrent"),
+    but pdb's skip matching does an fnmatch on the full dotted module name of
+    each frame, so a bare top-level entry never matches a submodule like
+    "concurrent.futures.thread". Emit both the bare name and a "name.*"
+    wildcard for every top-level module so submodules are covered too.
+    """
+    stdlib_path = sysconfig.get_paths()["stdlib"]
+    patterns = []
+    for module_info in pkgutil.iter_modules([stdlib_path]):
+        patterns.append(module_info.name)
+        patterns.append(f"{module_info.name}.*")
+    return patterns
 
 
 class CustomDebugger(ABC):

@@ -69,7 +69,34 @@ at the end (or wherever appropriate) or the real debugger behavior for that hook
 - The commented-out `dispatch_return`/`dispatch_exception`/`dispatch_line`/`dispatch_call`
   block at the bottom of `CustomDebugger` is dead exploratory code from trying
   lower-level bdb hooks instead of `preloop`/`postcmd` — useful context if `preloop`/`postcmd`
-  ever prove insufficient, but not currently wired up.
+  ever prove insufficient, but not currently wired up. Notably, the commented-out
+  `dispatch_return` variant checks `if frame is self.botframe: self.call_on_exit_once()`
+  — see the "no exit notification on step-to-completion" gap below, which this dead code
+  looks like an abandoned attempt to solve.
+- **Confirmed gap: no `exited`/`terminated` DAP event when the user steps (`n`/`s`) past
+  the end of their own traced code, instead of typing `c`/`q`.** `bdb`/`pdb` have no
+  concept of "the traced program is done" apart from an explicit `quit` (which raises
+  `BdbQuit`, caught via `set_quit`/`Debugger.set_trace`'s except clause). Once
+  `sys.settrace` is installed, tracing just keeps following whatever runs next — there's
+  nothing that detaches it when the user's own frames return. Confirmed by instrumenting
+  `set_quit`/`set_continue`/`call_on_exit_once` and stepping a real session past program
+  completion: none of them fired, and stepping continued into `concurrent.futures`
+  thread-pool teardown, then into IPython's `atexit_operations`, indefinitely — a DAP
+  client would keep receiving `stopped` events for meaningless internal frames and never
+  learn the session is over. The only place `exited`/`terminated` reliably fires in this
+  scenario is via the `atexit`-registered `_at_exit_cleanup` in `server.py`, when the
+  whole Python process exits — and even that only sends `notify_terminated`, not
+  `notify_exited` (unlike the `set_continue`-driven path, which sends both).
+  **This is not yet fixed** — reviving the dead `dispatch_return` hook above looked like
+  the obvious candidate, but it's not a safe drop-in: `self._exited` (`CustomDebugger`,
+  guarding `call_on_exit_once`'s idempotency) is only ever reset by
+  `Debugger.clear_exited()`, which fires *only* on a new DAP client connection — never on
+  a subsequent `set_trace()` call. `examples/example.py` calls `ipdab.set_trace()` twice
+  in one run; if `dispatch_return` fired `call_on_exit_once()` when the first call's
+  `botframe` returns, `_exited` would latch `True` and silently swallow the *second*
+  session's real exit notification for the rest of the process's life. Fixing this
+  properly means resetting `_exited` at the start of each `set_trace()` call too, not
+  just on client reconnect.
 
 ### Skip lists
 
@@ -254,11 +281,15 @@ Safely With Context Manager" example for the intended shape.
 - `preloop`/`postcmd` may both fire `_on_stop` for the same logical pause
   (`debugger.py:57` TODO) — a duplicate `stopped` event is a known open question, not
   necessarily a regression you introduced.
-- `pdb` backend's skip list omits `IPython.terminal.debugger`/`concurrent.futures.*`/`threading`
-  that the `ipdb` backend includes — likely an oversight, not a deliberate asymmetry.
+- No `exited`/`terminated` DAP event when stepping past the end of the traced code
+  (rather than `continue`/`quit`) — see "Confirmed gap" under Exit handling above for the
+  full story and why the obvious fix isn't a safe drop-in.
 - `background_server`'s `self.server = None` reset on shutdown is marked
   `# TODO: is this the correct fix?` — treat as unverified if debugging repeated
   start/stop cycles.
 - No test suite exists yet (see repo `CLAUDE.md`); changes to this threading/callback
   machinery should be manually exercised via `examples/example.py` plus a real DAP
-  client connection, since races here won't show up from reading the code alone.
+  client connection, since races here won't show up from reading the code alone. The
+  stdlib skip-list and exit-notification issues above were both only found this way —
+  by actually driving a live `ipdb`/`pdb` session with `pexpect` and instrumenting the
+  hooks, not by reading the code.
